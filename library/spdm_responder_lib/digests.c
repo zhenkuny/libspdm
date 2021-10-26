@@ -6,6 +6,8 @@
 
 #include "spdm_responder_lib_internal.h"
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 /**
   Process the SPDM GET_DIGESTS request and return the response.
 
@@ -70,17 +72,10 @@ return_status spdm_get_response_digests(IN void *context, IN uintn request_size,
 		return RETURN_SUCCESS;
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	spdm_request_size = request_size;
-
-	if (spdm_context->local_context.local_cert_chain_provision == NULL) {
-		spdm_generate_error_response(
-			spdm_context, SPDM_ERROR_CODE_UNSUPPORTED_REQUEST,
-			SPDM_GET_DIGESTS, response_size, response);
-		return RETURN_SUCCESS;
-	}
 
 	no_local_cert_chain = TRUE;
 	for (index = 0; index < MAX_SPDM_SLOT_COUNT; index++) {
@@ -119,6 +114,13 @@ return_status spdm_get_response_digests(IN void *context, IN uintn request_size,
 	digest = (void *)(spdm_response + 1);
 	for (index = 0; index < spdm_context->local_context.slot_count;
 	     index++) {
+		if (spdm_context->local_context
+						  .local_cert_chain_provision[index] == NULL) {
+			spdm_generate_error_response(
+				spdm_context, SPDM_ERROR_CODE_UNSPECIFIED,
+				0, response_size, response);
+			return RETURN_SUCCESS;
+		}
 		spdm_response->header.param2 |= (1 << index);
 		spdm_generate_cert_chain_hash(spdm_context, index,
 					      &digest[hash_size * index]);
@@ -149,3 +151,5 @@ return_status spdm_get_response_digests(IN void *context, IN uintn request_size,
 
 	return RETURN_SUCCESS;
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP

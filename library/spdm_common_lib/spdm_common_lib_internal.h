@@ -50,15 +50,19 @@ typedef struct {
 	// My provisioned certificate (for slot_id - 0xFF, default 0)
 	uint8 provisioned_slot_id;
 	//
-	// Peer Root Certificate hash
+	// Peer Root Certificate
 	//
-	void *peer_root_cert_hash_provision;
-	uintn peer_root_cert_hash_provision_size;
+	void *peer_root_cert_provision;
+	uintn peer_root_cert_provision_size;
 	//
 	// Peer CertificateChain
+	// Whether it contains the root certificate or not,
+	// it should be equal to the one returned from peer by get_certificate
 	//
 	void *peer_cert_chain_provision;
 	uintn peer_cert_chain_provision_size;
+	// Peer Cert verify
+	spdm_verify_spdm_cert_chain_func verify_peer_spdm_cert_chain;
 	//
 	// PSK provision locally
 	//
@@ -86,10 +90,10 @@ typedef struct {
 	//
 	// Peer device info (negotiated)
 	//
-	spdm_device_version_t version;
+	spdm_version_number_t version;
 	spdm_device_capability_t capability;
 	spdm_device_algorithm_t algorithm;
-	spdm_device_version_t secured_message_version;
+	spdm_version_number_t secured_message_version;
 	//
 	// Peer CertificateChain
 	//
@@ -117,10 +121,15 @@ typedef struct {
 typedef struct {
 	uintn max_buffer_size;
 	uintn buffer_size;
+	uint8 buffer[MAX_SPDM_MESSAGE_MEDIUM_BUFFER_SIZE];
+} medium_managed_buffer_t;
+
+typedef struct {
+	uintn max_buffer_size;
+	uintn buffer_size;
 	uint8 buffer[MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE];
 } small_managed_buffer_t;
 
-typedef struct {
 	//
 	// signature = Sign(SK, hash(M1))
 	// Verify(PK, hash(M2), signature)
@@ -134,22 +143,28 @@ typedef struct {
 	// MutB = Concatenate (GET_DIGEST, DIGEST, GET_CERTFICATE, CERTIFICATE)
 	// MutC = Concatenate (CHALLENGE, CHALLENGE_AUTH\signature)
 	//
-	small_managed_buffer_t message_a;
-	large_managed_buffer_t message_b;
-	small_managed_buffer_t message_c;
-	large_managed_buffer_t message_mut_b;
-	small_managed_buffer_t message_mut_c;
-	//
 	// signature = Sign(SK, hash(L1))
 	// Verify(PK, hash(L2), signature)
 	//
 	// L1/L2 = Concatenate (M)
 	// M = Concatenate (GET_MEASUREMENT, MEASUREMENT\signature)
 	//
+typedef struct {
+	// the message_a must be plan text because we do not know the algorithm yet.
+	small_managed_buffer_t message_a;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	large_managed_buffer_t message_b;
+	small_managed_buffer_t message_c;
+	large_managed_buffer_t message_mut_b;
+	small_managed_buffer_t message_mut_c;
 	large_managed_buffer_t message_m;
+#else
+	void                   *digest_context_m1m2;
+	void                   *digest_context_mut_m1m2;
+	void                   *digest_context_l1l2;
+#endif
 } spdm_transcript_t;
 
-typedef struct {
 	//
 	// TH for KEY_EXCHANGE response signature: Concatenate (A, Ct, K)
 	// Ct = certificate chain
@@ -181,13 +196,11 @@ typedef struct {
 	// CM = mutual certificate chain *
 	// F  = Concatenate (FINISH request, FINISH response)
 	//
-	large_managed_buffer_t message_k;
-	large_managed_buffer_t message_f;
 	//
 	// TH for PSK_EXCHANGE response HMAC: Concatenate (A, K)
 	// K  = Concatenate (PSK_EXCHANGE request, PSK_EXCHANGE response\verify_data)
 	//
-	// TH for PSK_FINISH response HMAC: Concatenate (A, K, PF)
+	// TH for PSK_FINISH response HMAC: Concatenate (A, K, F)
 	// K  = Concatenate (PSK_EXCHANGE request, PSK_EXCHANGE response)
 	// F  = Concatenate (PSK_FINISH request\verify_data)
 	//
@@ -202,6 +215,25 @@ typedef struct {
 	// K  = Concatenate (PSK_EXCHANGE request, PSK_EXCHANGE response)
 	// F  = Concatenate (PSK_FINISH request, PSK_FINISH response)
 	//
+typedef struct {
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	large_managed_buffer_t message_k;
+	large_managed_buffer_t message_f;
+	large_managed_buffer_t message_m;
+#else
+	// the message_k must be plan text because we do not know the finished_key yet.
+	medium_managed_buffer_t temp_message_k;
+	boolean                message_f_initialized;
+	boolean                finished_key_ready;
+	void                   *digest_context_th;
+	void                   *digest_context_l1l2;
+	void                   *hmac_rsp_context_th;
+	void                   *hmac_req_context_th;
+	// this is back up for message F reset.
+	void                   *digest_context_th_backup;
+	void                   *hmac_rsp_context_th_backup;
+	void                   *hmac_req_context_th_backup;
+#endif
 } spdm_session_transcript_t;
 
 typedef struct {
@@ -310,6 +342,16 @@ typedef struct {
 	// Register for the retry times when receive "BUSY" Error response (requester only)
 	//
 	uint8 retry_times;
+
+	//
+	// Opaque context data for use by application
+	//
+	void *opaque_context_data_ptr;
+
+	//
+	// Register for the last KEY_UPDATE token and operation (responder only)
+	//
+	uint8 last_update_request[4];
 } spdm_context_t;
 
 /**
@@ -350,18 +392,6 @@ return_status append_managed_buffer(IN OUT void *managed_buffer_t,
 				    IN void *buffer, IN uintn buffer_size);
 
 /**
-  Shrink the size of the managed buffer.
-
-  @param  managed_buffer_t                The managed buffer to be shrinked.
-  @param  buffer_size                   The size in bytes of the size of the buffer to be shrinked.
-
-  @retval RETURN_SUCCESS               The managed buffer is shrinked.
-  @retval RETURN_BUFFER_TOO_SMALL      The managed buffer is too small to be shrinked.
-**/
-return_status shrink_managed_buffer(IN OUT void *managed_buffer_t,
-				    IN uintn buffer_size);
-
-/**
   Reset the managed buffer.
   The buffer_size is reset to 0.
   The max_buffer_size is unchanged.
@@ -397,6 +427,16 @@ void *get_managed_buffer(IN void *managed_buffer_t);
 **/
 void init_managed_buffer(IN OUT void *managed_buffer_t,
 			 IN uintn max_buffer_size);
+
+/**
+  Reset message buffer in SPDM context according to request code.
+
+  @param  spdm_context               	A pointer to the SPDM context.
+  @param  spdm_session_info             A pointer to the SPDM session context.
+  @param  spdm_request               	The SPDM request code.
+*/
+void spdm_reset_message_buffer_via_request_code(IN void *context, IN void *session_info,
+			       IN uint8 request_code);
 
 /**
   This function initializes the session info.
@@ -455,6 +495,7 @@ spdm_is_capabilities_flag_supported(IN spdm_context_t *spdm_context,
 				    IN uint32 requester_capabilities_flag,
 				    IN uint32 responder_capabilities_flag);
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 /*
   This function calculates m1m2.
 
@@ -468,18 +509,53 @@ spdm_is_capabilities_flag_supported(IN spdm_context_t *spdm_context,
 boolean spdm_calculate_m1m2(IN void *context, IN boolean is_mut,
 			    IN OUT uintn *m1m2_buffer_size,
 			    OUT void *m1m2_buffer);
-
+#else
 /*
-  This function calculates l1l2.
+  This function calculates m1m2 hash.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  is_mut                        Indicate if this is from mutual authentication.
+  @param  m1m2_hash_size               size in bytes of the m1m2 hash
+  @param  m1m2_hash                   The buffer to store the m1m2 hash
+
+  @retval RETURN_SUCCESS  m1m2 is calculated.
+*/
+boolean spdm_calculate_m1m2_hash(IN void *context, IN boolean is_mut,
+			    IN OUT uintn *m1m2_hash_size,
+			    OUT void *m1m2_hash);
+#endif
+
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+/*
+  This function calculates l1l2.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  l1l2_buffer_size               size in bytes of the l1l2
   @param  l1l2_buffer                   The buffer to store the l1l2
 
   @retval RETURN_SUCCESS  l1l2 is calculated.
 */
-boolean spdm_calculate_l1l2(IN void *context, IN OUT uintn *l1l2_buffer_size,
-			    OUT void *l1l2_buffer);
+boolean spdm_calculate_l1l2(IN void *context, IN void *session_info,
+				IN OUT uintn *l1l2_buffer_size, OUT void *l1l2_buffer);
+#else
+/*
+  This function calculates l1l2 hash.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
+  @param  l1l2_hash_size               size in bytes of the l1l2 hash
+  @param  l1l2_hash                   The buffer to store the l1l2 hash
+
+  @retval RETURN_SUCCESS  l1l2 is calculated.
+*/
+boolean spdm_calculate_l1l2_hash(IN void *context, IN void *session_info,
+				IN OUT uintn *l1l2_hash_size, OUT void *l1l2_hash);
+#endif
 
 /**
   This function generates the certificate chain hash.
@@ -499,13 +575,13 @@ boolean spdm_generate_cert_chain_hash(IN spdm_context_t *spdm_context,
 
   @param  spdm_context                  A pointer to the SPDM context.
   @param  digest                       The digest data buffer.
-  @param  digest_size                   size in bytes of the digest data buffer.
+  @param  digest_count                   size of the digest data buffer.
 
   @retval TRUE  digest verification pass.
   @retval FALSE digest verification fail.
 **/
 boolean spdm_verify_peer_digests(IN spdm_context_t *spdm_context,
-				 IN void *digest, IN uintn digest_size);
+				 IN void *digest, IN uintn digest_count);
 
 /**
   This function verifies peer certificate chain buffer including spdm_cert_chain_t header.
@@ -513,13 +589,17 @@ boolean spdm_verify_peer_digests(IN spdm_context_t *spdm_context,
   @param  spdm_context                  A pointer to the SPDM context.
   @param  cert_chain_buffer              Certitiface chain buffer including spdm_cert_chain_t header.
   @param  cert_chain_buffer_size          size in bytes of the certitiface chain buffer.
+  @param  trust_anchor                  A buffer to hold the trust_anchor which is used to validate the peer certificate, if not NULL.
+  @param  trust_anchor_size             A buffer to hold the trust_anchor_size, if not NULL.
 
   @retval TRUE  Peer certificate chain buffer verification passed.
   @retval FALSE Peer certificate chain buffer verification failed.
 **/
 boolean spdm_verify_peer_cert_chain_buffer(IN spdm_context_t *spdm_context,
 					   IN void *cert_chain_buffer,
-					   IN uintn cert_chain_buffer_size);
+					   IN uintn cert_chain_buffer_size,
+					   OUT void **trust_anchor OPTIONAL,
+					   OUT uintn *trust_anchor_size OPTIONAL);
 
 /**
   This function generates the challenge signature based upon m1m2 for authentication.
@@ -600,20 +680,27 @@ spdm_generate_measurement_summary_hash(IN spdm_context_t *spdm_context,
 
 /**
   This function generates the measurement signature to response message based upon l1l2.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  signature                    The buffer to store the signature.
 
-  @retval TRUE  measurement signature is created.
-  @retval FALSE measurement signature is not created.
+  @retval TRUE  measurement signature is generated.
+  @retval FALSE measurement signature is not generated.
 **/
 boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
+						IN spdm_session_info_t *session_info,
 					    OUT uint8 *signature);
 
 /**
   This function verifies the measurement signature based upon l1l2.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  sign_data                     The signature data buffer.
   @param  sign_data_size                 size in bytes of the signature data buffer.
 
@@ -621,6 +708,7 @@ boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
   @retval FALSE signature verification fail.
 **/
 boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
+					  IN spdm_session_info_t *session_info,
 					  IN void *sign_data,
 					  IN uintn sign_data_size);
 
@@ -925,4 +1013,12 @@ spdm_process_opaque_data_supported_version_data(IN spdm_context_t *spdm_context,
 						IN uintn data_in_size,
 						IN void *data_in);
 
+/**
+  Return the SPDMversion field of the version number struct.
+
+  @param  ver				Spdm version number struct.
+
+  @return the SPDMversion of the version number struct.
+**/
+uint8 spdm_get_version_from_version_number(IN spdm_version_number_t ver);
 #endif

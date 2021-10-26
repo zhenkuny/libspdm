@@ -50,6 +50,23 @@ void spdm_secured_message_set_use_psk(IN void *spdm_secured_message_context,
 }
 
 /**
+  Return if finished_key is ready.
+
+  @param  spdm_secured_message_context    A pointer to the SPDM secured message context.
+
+  @retval TRUE  finished_key is ready.
+  @retval FALSE finished_key is not ready.
+*/
+boolean
+spdm_secured_message_is_finished_key_ready(IN void *spdm_secured_message_context)
+{
+	spdm_secured_message_context_t *secured_message_context;
+
+	secured_message_context = spdm_secured_message_context;
+	return secured_message_context->finished_key_ready;
+}
+
+/**
   Set session_state to an SPDM secured message context.
 
   @param  spdm_secured_message_context    A pointer to the SPDM secured message context.
@@ -63,6 +80,11 @@ void spdm_secured_message_set_session_state(
 
 	secured_message_context = spdm_secured_message_context;
 	secured_message_context->session_state = session_state;
+
+	if (session_state == SPDM_SESSION_STATE_ESTABLISHED) {
+		/* session handshake key should be zeroized after handshake phase. */
+		spdm_clear_handshake_secret(secured_message_context);
+	}
 }
 
 /**
@@ -106,6 +128,8 @@ void spdm_secured_message_set_session_type(IN void *spdm_secured_message_context
   @param  key_schedule                  Indicate the negotiated key_schedule for the SPDM session.
 */
 void spdm_secured_message_set_algorithms(IN void *spdm_secured_message_context,
+					 IN spdm_version_number_t version,
+					 IN spdm_version_number_t secured_message_version,
 					 IN uint32 base_hash_algo,
 					 IN uint16 dhe_named_group,
 					 IN uint16 aead_cipher_suite,
@@ -114,6 +138,8 @@ void spdm_secured_message_set_algorithms(IN void *spdm_secured_message_context,
 	spdm_secured_message_context_t *secured_message_context;
 
 	secured_message_context = spdm_secured_message_context;
+	secured_message_context->version = version;
+	secured_message_context->secured_message_version = secured_message_version;
 	secured_message_context->base_hash_algo = base_hash_algo;
 	secured_message_context->dhe_named_group = dhe_named_group;
 	secured_message_context->aead_cipher_suite = aead_cipher_suite;

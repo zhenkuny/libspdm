@@ -161,10 +161,15 @@ return_status spdm_get_response_algorithms(IN void *spdm_context,
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
   @retval RETURN_SECURITY_VIOLATION    Any verification fails.
 **/
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 return_status spdm_get_response_digests(IN void *spdm_context,
 					IN uintn request_size, IN void *request,
 					IN OUT uintn *response_size,
 					OUT void *response);
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
 
 /**
   Process the SPDM GET_CERTIFICATE request and return the response.
@@ -183,11 +188,16 @@ return_status spdm_get_response_digests(IN void *spdm_context,
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
   @retval RETURN_SECURITY_VIOLATION    Any verification fails.
 **/
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 return_status spdm_get_response_certificate(IN void *spdm_context,
 					    IN uintn request_size,
 					    IN void *request,
 					    IN OUT uintn *response_size,
 					    OUT void *response);
+
+#endif // ENABLE_SPDM_GET_CERTIFICATE
 
 /**
   Process the SPDM CHALLENGE request and return the response.
@@ -206,11 +216,16 @@ return_status spdm_get_response_certificate(IN void *spdm_context,
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
   @retval RETURN_SECURITY_VIOLATION    Any verification fails.
 **/
+
+#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
 return_status spdm_get_response_challenge_auth(IN void *spdm_context,
 					       IN uintn request_size,
 					       IN void *request,
 					       IN OUT uintn *response_size,
 					       OUT void *response);
+
+#endif // #if SPDM_ENABLE_CAPABILITY_CHAL_CAP
 
 /**
   Process the SPDM GET_MEASUREMENT request and return the response.
@@ -229,11 +244,16 @@ return_status spdm_get_response_challenge_auth(IN void *spdm_context,
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
   @retval RETURN_SECURITY_VIOLATION    Any verification fails.
 **/
+
+#if SPDM_ENABLE_CAPABILITY_MEAS_CAP
+
 return_status spdm_get_response_measurements(IN void *spdm_context,
 					     IN uintn request_size,
 					     IN void *request,
 					     IN OUT uintn *response_size,
 					     OUT void *response);
+
+#endif // SPDM_ENABLE_CAPABILITY_MEAS_CAP
 
 /**
   Process the SPDM KEY_EXCHANGE request and return the response.
@@ -467,9 +487,13 @@ spdm_get_encap_request_get_digest(IN spdm_context_t *spdm_context,
   @retval RETURN_BUFFER_TOO_SMALL      The buffer is too small to hold the data.
   @retval RETURN_SECURITY_VIOLATION    Any verification fails.
 **/
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 return_status spdm_process_encap_response_digest(
 	IN spdm_context_t *spdm_context, IN uintn encap_response_size,
 	IN void *encap_response, OUT boolean *need_continue);
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
 
 /**
   Get the SPDM encapsulated GET_CERTIFICATE request.
@@ -604,15 +628,12 @@ void spdm_init_basic_mut_auth_encap_state(IN spdm_context_t *spdm_context,
   This function handles the encap error response.
 
   @param  spdm_context                  A pointer to the SPDM context.
-  @param  managed_buffer_t                The managed buffer to be shrinked.
-  @param  shrink_buffer_size             The size in bytes of the size of the buffer to be shrinked.
   @param  error_code                    Indicate the error code.
 
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
 **/
 return_status spdm_handle_encap_error_response_main(
-	IN spdm_context_t *spdm_context, IN OUT void *m_buffer,
-	IN uintn shrink_buffer_size, IN uint8 error_code);
+	IN spdm_context_t *spdm_context, IN uint8 error_code);
 
 /**
   Set session_state to an SPDM secured message context and trigger callback.

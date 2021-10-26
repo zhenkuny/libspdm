@@ -85,7 +85,7 @@ typedef enum {
 	//
 	SPDM_DATA_LOCAL_PUBLIC_CERT_CHAIN,
 	SPDM_DATA_LOCAL_SLOT_COUNT,
-	SPDM_DATA_PEER_PUBLIC_ROOT_CERT_HASH,
+	SPDM_DATA_PEER_PUBLIC_ROOT_CERT,
 	SPDM_DATA_PEER_PUBLIC_CERT_CHAIN,
 	SPDM_DATA_BASIC_MUT_AUTH_REQUESTED,
 	SPDM_DATA_MUT_AUTH_REQUESTED,
@@ -106,7 +106,11 @@ typedef enum {
 	SPDM_DATA_SESSION_USE_PSK,
 	SPDM_DATA_SESSION_MUT_AUTH_REQUESTED,
 	SPDM_DATA_SESSION_END_SESSION_ATTRIBUTES,
-
+	//
+	// Opaque data that can be used by the application
+	// during callback functions such spdm_device_send_message_func.
+	//
+	SPDM_DATA_OPAQUE_CONTEXT_DATA,
 	//
 	// MAX
 	//
@@ -444,6 +448,53 @@ void spdm_register_transport_layer_func(
 	IN spdm_transport_decode_message_func transport_decode_message);
 
 /**
+  Verify a SPDM cert chain in a slot.
+
+  This function shall verify:
+    1) The integrity of the certificate chain. (Root Cert Hash->Root Cert->Cert Chain)
+    2) The trust anchor. (Root Cert Hash/Root cert matches the trust anchor)
+
+  The function shall check the negotiated hash algorithm to check root cert hash.
+  The function shall check the negotiated (req) asym algorithm to determine if it is right cert chain.
+
+  The function returns error if either of above is not satisfied.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  slot_id                       The number of slot for the certificate chain.
+  @param  cert_chain_size               Indicate the size in bytes of the certificate chain.
+  @param  cert_chain                    A pointer to the buffer storing the certificate chain
+                                        returned from GET_CERTIFICATE. It starts with spdm_cert_chain_t.
+  @param  trust_anchor                  A buffer to hold the trust_anchor which is used to validate the peer certificate, if not NULL.
+  @param  trust_anchor_size             A buffer to hold the trust_anchor_size, if not NULL.
+
+  @retval RETURN_SUCCESS                The cert chain verification pass.
+  @retval RETURN_SECURIY_VIOLATION      The cert chain verification fail.
+**/
+typedef return_status (*spdm_verify_spdm_cert_chain_func)(
+	IN void *spdm_context, IN uint8 slot_id,
+	IN uintn cert_chain_size, IN void *cert_chain,
+	OUT void **trust_anchor OPTIONAL,
+	OUT uintn *trust_anchor_size OPTIONAL);
+
+/**
+  Register SPDM certificate verification functions for SPDM GET_CERTIFICATE in requester or responder.
+  It is called after GET_CERTIFICATE gets a full certificate chain from peer.
+
+  If it is NOT registered, the default verification in SPDM lib will be used. It verifies:
+  	1) The integrity of the certificate chain, (Root Cert Hash->Root Cert->Cert Chain), according to X.509.
+    2) The trust anchor, according SPDM_DATA_PEER_PUBLIC_ROOT_CERT or SPDM_DATA_PEER_PUBLIC_CERT_CHAIN.
+  If it is registered, SPDM lib will use this function to verify the certificate.
+
+  This function must be called after spdm_init_context, and before any SPDM communication.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  verify_certificate            The fuction to verify an SPDM certificate after GET_CERTIFICATE.
+**/
+void spdm_register_verify_spdm_cert_chain_func(
+	IN void *spdm_context,
+	IN spdm_verify_spdm_cert_chain_func verify_spdm_cert_chain);
+
+/**
   Reset message A cache in SPDM context.
 
   @param  spdm_context                  A pointer to the SPDM context.
@@ -480,19 +531,29 @@ void spdm_reset_message_mut_c(IN void *spdm_context);
 
 /**
   Reset message M cache in SPDM context.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
 **/
-void spdm_reset_message_m(IN void *spdm_context);
+void spdm_reset_message_m(IN void *context, IN void *session_info);
 
 /**
-  Reset message buffer in SPDM context according to request code.
+  Reset message K cache in SPDM context.
 
-  @param  spdm_context                A pointer to the SPDM context.
-  @param  spdm_request                The SPDM request code.
-*/
-void spdm_reset_message_buffer_via_request_code(IN void *context,
-			       IN uint8 request_code);
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  spdm_session_info              A pointer to the SPDM session context.
+**/
+void spdm_reset_message_k(IN void *context, IN void *spdm_session_info);
+
+/**
+  Reset message F cache in SPDM context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  spdm_session_info              A pointer to the SPDM session context.
+**/
+void spdm_reset_message_f(IN void *context, IN void *spdm_session_info);
 
 /**
   Append message A cache in SPDM context.
@@ -561,42 +622,49 @@ return_status spdm_append_message_mut_c(IN void *spdm_context, IN void *message,
 
 /**
   Append message M cache in SPDM context.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_m(IN void *spdm_context, IN void *message,
-				    IN uintn message_size);
+return_status spdm_append_message_m(IN void *context, IN void *session_info,
+					IN void *message, IN uintn message_size);
 
 /**
   Append message K cache in SPDM context.
 
+  @param  spdm_context                  A pointer to the SPDM context.
   @param  spdm_session_info              A pointer to the SPDM session context.
+  @param  is_requester                  Indicate of the key generation for a requester or a responder.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_k(IN void *spdm_session_info,
-				    IN void *message, IN uintn message_size);
+return_status spdm_append_message_k(IN void *context, IN void *spdm_session_info,
+            IN boolean is_requester, IN void *message, IN uintn message_size);
 
 /**
   Append message F cache in SPDM context.
 
+  @param  spdm_context                  A pointer to the SPDM context.
   @param  spdm_session_info              A pointer to the SPDM session context.
+  @param  is_requester                  Indicate of the key generation for a requester or a responder.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_f(IN void *spdm_session_info,
-				    IN void *message, IN uintn message_size);
+return_status spdm_append_message_f(IN void *context, IN void *spdm_session_info,
+            IN boolean is_requester, IN void *message, IN uintn message_size);
 
 /**
   This function gets the session info via session ID.
@@ -651,13 +719,14 @@ void *spdm_assign_session_id(IN void *spdm_context, IN uint32 session_id,
 **/
 void *spdm_free_session_id(IN void *spdm_context, IN uint32 session_id);
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 /*
   This function calculates current TH data with message A and message K.
 
   @param  spdm_context                  A pointer to the SPDM context.
   @param  session_info                  The SPDM session ID.
-  @param  cert_chain_data                Certitiface chain data without spdm_cert_chain_t header.
-  @param  cert_chain_data_size            size in bytes of the certitiface chain data.
+  @param  cert_chain_buffer                Certitiface chain buffer with spdm_cert_chain_t header.
+  @param  cert_chain_buffer_size            size in bytes of the certitiface chain buffer.
   @param  th_data_buffer_size             size in bytes of the th_data_buffer
   @param  th_data_buffer                 The buffer to store the th_data_buffer
 
@@ -665,18 +734,48 @@ void *spdm_free_session_id(IN void *spdm_context, IN uint32 session_id);
 */
 boolean spdm_calculate_th_for_exchange(
 	IN void *spdm_context, IN void *spdm_session_info,
-	IN uint8 *cert_chain_data, OPTIONAL IN uintn cert_chain_data_size,
+	IN uint8 *cert_chain_buffer, OPTIONAL IN uintn cert_chain_buffer_size,
 	OPTIONAL IN OUT uintn *th_data_buffer_size, OUT void *th_data_buffer);
+#else
+/*
+  This function calculates current TH hash with message A and message K.
 
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  The SPDM session ID.
+  @param  th_hash_buffer_size             size in bytes of the th_hash_buffer
+  @param  th_hash_buffer                 The buffer to store the th_hash_buffer
+
+  @retval RETURN_SUCCESS  current TH hash is calculated.
+*/
+boolean spdm_calculate_th_hash_for_exchange(
+	IN void *context, IN void *spdm_session_info,
+	OPTIONAL IN OUT uintn *th_hash_buffer_size, OUT void *th_hash_buffer);
+
+/*
+  This function calculates current TH hmac with message A and message K, with response finished_key.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  The SPDM session ID.
+  @param  th_hmac_buffer_size             size in bytes of the th_hmac_buffer
+  @param  th_hmac_buffer                 The buffer to store the th_hmac_buffer
+
+  @retval RETURN_SUCCESS  current TH hmac is calculated.
+*/
+boolean spdm_calculate_th_hmac_for_exchange_rsp(
+	IN void *context, IN void *spdm_session_info, IN boolean is_requester,
+	OPTIONAL IN OUT uintn *th_hmac_buffer_size, OUT void *th_hmac_buffer);
+#endif
+
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 /*
   This function calculates current TH data with message A, message K and message F.
 
   @param  spdm_context                  A pointer to the SPDM context.
   @param  session_info                  The SPDM session ID.
-  @param  cert_chain_data                Certitiface chain data without spdm_cert_chain_t header.
-  @param  cert_chain_data_size            size in bytes of the certitiface chain data.
-  @param  mut_cert_chain_data             Certitiface chain data without spdm_cert_chain_t header in mutual authentication.
-  @param  mut_cert_chain_data_size         size in bytes of the certitiface chain data in mutual authentication.
+  @param  cert_chain_buffer                Certitiface chain buffer with spdm_cert_chain_t header.
+  @param  cert_chain_buffer_size            size in bytes of the certitiface chain buffer.
+  @param  mut_cert_chain_buffer             Certitiface chain buffer with spdm_cert_chain_t header in mutual authentication.
+  @param  mut_cert_chain_buffer_size         size in bytes of the certitiface chain buffer in mutual authentication.
   @param  th_data_buffer_size             size in bytes of the th_data_buffer
   @param  th_data_buffer                 The buffer to store the th_data_buffer
 
@@ -684,12 +783,58 @@ boolean spdm_calculate_th_for_exchange(
 */
 boolean spdm_calculate_th_for_finish(IN void *spdm_context,
 				     IN void *spdm_session_info,
-				     IN uint8 *cert_chain_data,
-				     OPTIONAL IN uintn cert_chain_data_size,
-				     OPTIONAL IN uint8 *mut_cert_chain_data,
-				     OPTIONAL IN uintn mut_cert_chain_data_size,
+				     IN uint8 *cert_chain_buffer,
+				     OPTIONAL IN uintn cert_chain_buffer_size,
+				     OPTIONAL IN uint8 *mut_cert_chain_buffer,
+				     OPTIONAL IN uintn mut_cert_chain_buffer_size,
 				     OPTIONAL IN OUT uintn *th_data_buffer_size,
 				     OUT void *th_data_buffer);
+#else
+/*
+  This function calculates current TH hash with message A, message K and message F.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  The SPDM session ID.
+  @param  th_hash_buffer_size             size in bytes of the th_hash_buffer
+  @param  th_hash_buffer                 The buffer to store the th_hash_buffer
+
+  @retval RETURN_SUCCESS  current TH hash is calculated.
+*/
+boolean spdm_calculate_th_hash_for_finish(IN void *spdm_context,
+				     IN void *spdm_session_info,
+				     OPTIONAL IN OUT uintn *th_hash_buffer_size,
+				     OUT void *th_hash_buffer);
+
+/*
+  This function calculates current TH hmac with message A, message K and message F, with response finished_key.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  The SPDM session ID.
+  @param  th_hmac_buffer_size             size in bytes of the th_hmac_buffer
+  @param  th_hmac_buffer                 The buffer to store the th_hmac_buffer
+
+  @retval RETURN_SUCCESS  current TH hmac is calculated.
+*/
+boolean spdm_calculate_th_hmac_for_finish_rsp(IN void *spdm_context,
+				     IN void *spdm_session_info,
+				     OPTIONAL IN OUT uintn *th_hmac_buffer_size,
+				     OUT void *th_hmac_buffer);
+
+/*
+  This function calculates current TH hmac with message A, message K and message F, with request finished_key.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  The SPDM session ID.
+  @param  th_hmac_buffer_size             size in bytes of the th_hmac_buffer
+  @param  th_hmac_buffer                 The buffer to store the th_hmac_buffer
+
+  @retval RETURN_SUCCESS  current TH hmac is calculated.
+*/
+boolean spdm_calculate_th_hmac_for_finish_req(IN void *spdm_context,
+				     IN void *spdm_session_info,
+				     OPTIONAL IN OUT uintn *th_hmac_buffer_size,
+				     OUT void *th_hmac_buffer);
+#endif
 
 /*
   This function calculates th1 hash.

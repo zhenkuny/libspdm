@@ -43,8 +43,7 @@ return_status try_spdm_heartbeat(IN void *context, IN uint32 session_id)
 		    SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_HBEAT_CAP)) {
 		return RETURN_UNSUPPORTED;
 	}
-	spdm_reset_message_buffer_via_request_code(spdm_context,
-											SPDM_HEARTBEAT);
+
 	if (spdm_context->connection_info.connection_state <
 	    SPDM_CONNECTION_STATE_NEGOTIATED) {
 		return RETURN_UNSUPPORTED;
@@ -71,6 +70,9 @@ return_status try_spdm_heartbeat(IN void *context, IN uint32 session_id)
 		return RETURN_DEVICE_ERROR;
 	}
 
+	spdm_reset_message_buffer_via_request_code(spdm_context, session_info,
+											SPDM_HEARTBEAT);
+
 	spdm_response_size = sizeof(spdm_response);
 	zero_mem(&spdm_response, sizeof(spdm_response));
 	status = spdm_receive_spdm_response(
@@ -83,7 +85,7 @@ return_status try_spdm_heartbeat(IN void *context, IN uint32 session_id)
 	}
 	if (spdm_response.header.request_response_code == SPDM_ERROR) {
 		status = spdm_handle_error_response_main(
-			spdm_context, &session_id, NULL, 0, &spdm_response_size,
+			spdm_context, &session_id, &spdm_response_size,
 			&spdm_response, SPDM_HEARTBEAT, SPDM_HEARTBEAT_ACK,
 			sizeof(spdm_heartbeat_response_mine_t));
 		if (RETURN_ERROR(status)) {

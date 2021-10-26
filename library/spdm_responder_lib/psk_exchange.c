@@ -137,7 +137,15 @@ return_status spdm_get_response_psk_exchange(IN void *context,
 			return RETURN_SUCCESS;
 		}
 	}
-
+	if (!spdm_is_capabilities_flag_supported(
+			spdm_context, FALSE,
+			0, SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_MEAS_CAP) &&
+			spdm_request->header.param1 > 0) {
+		spdm_generate_error_response(
+			spdm_context, SPDM_ERROR_CODE_UNSUPPORTED_REQUEST,
+			SPDM_PSK_EXCHANGE, response_size, response);
+		return RETURN_SUCCESS;
+	}
 	slot_id = spdm_request->header.param2;
 	if (slot_id >= spdm_context->local_context.slot_count) {
 		spdm_generate_error_response(spdm_context,
@@ -221,7 +229,7 @@ return_status spdm_get_response_psk_exchange(IN void *context,
 		return RETURN_SUCCESS;
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	spdm_response->rsp_session_id = rsp_session_id;
@@ -234,6 +242,12 @@ return_status spdm_get_response_psk_exchange(IN void *context,
 
 	result = spdm_generate_measurement_summary_hash(
 		spdm_context, FALSE, spdm_request->header.param1, ptr);
+	if ((measurement_summary_hash_size == 0) &&
+		(spdm_request->header.param2 != SPDM_CHALLENGE_REQUEST_NO_MEASUREMENT_SUMMARY_HASH)) {
+		return spdm_generate_error_response(spdm_context,
+						SPDM_ERROR_CODE_INVALID_REQUEST,
+						0, response_size, response);
+	}
 	if (!result) {
 		spdm_free_session_id(spdm_context, session_id);
 		spdm_generate_error_response(spdm_context,
@@ -254,7 +268,7 @@ return_status spdm_get_response_psk_exchange(IN void *context,
 	ptr += opaque_psk_exchange_rsp_size;
 
 
-	status = spdm_append_message_k(session_info, request, request_size);
+	status = spdm_append_message_k(spdm_context, session_info, FALSE, request, request_size);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, session_id);
 		spdm_generate_error_response(spdm_context,
@@ -263,7 +277,7 @@ return_status spdm_get_response_psk_exchange(IN void *context,
 		return RETURN_SUCCESS;
 	}
 	
-	status = spdm_append_message_k(session_info, spdm_response,
+	status = spdm_append_message_k(spdm_context, session_info, FALSE, spdm_response,
 				       (uintn)ptr - (uintn)spdm_response);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, session_id);
@@ -303,7 +317,7 @@ return_status spdm_get_response_psk_exchange(IN void *context,
 			0, response_size, response);
 		return RETURN_SUCCESS;
 	}
-	status = spdm_append_message_k(session_info, ptr, hmac_size);
+	status = spdm_append_message_k(spdm_context, session_info, FALSE, ptr, hmac_size);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, session_id);
 		spdm_generate_error_response(spdm_context,

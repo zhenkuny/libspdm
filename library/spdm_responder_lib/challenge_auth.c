@@ -6,6 +6,9 @@
 
 #include "spdm_responder_lib_internal.h"
 
+
+#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
 /**
   Process the SPDM CHALLENGE request and return the response.
 
@@ -93,7 +96,12 @@ return_status spdm_get_response_challenge_auth(IN void *context,
 		spdm_context->connection_info.algorithm.base_hash_algo);
 	measurement_summary_hash_size = spdm_get_measurement_summary_hash_size(
 		spdm_context, FALSE, spdm_request->header.param2);
-
+	if ((measurement_summary_hash_size == 0) &&
+		(spdm_request->header.param2 != SPDM_CHALLENGE_REQUEST_NO_MEASUREMENT_SUMMARY_HASH)) {
+		return spdm_generate_error_response(spdm_context,
+						SPDM_ERROR_CODE_INVALID_REQUEST,
+						0, response_size, response);
+	}
 	total_size =
 		sizeof(spdm_challenge_auth_response_t) + hash_size +
 		SPDM_NONCE_SIZE + measurement_summary_hash_size +
@@ -118,7 +126,7 @@ return_status spdm_get_response_challenge_auth(IN void *context,
 					     response_size, response);
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	spdm_response->header.request_response_code = SPDM_CHALLENGE_AUTH;
@@ -194,7 +202,7 @@ return_status spdm_get_response_challenge_auth(IN void *context,
 	status = spdm_append_message_c(spdm_context, spdm_response,
 				       (uintn)ptr - (uintn)spdm_response);
 	if (RETURN_ERROR(status)) {
-		reset_managed_buffer(&spdm_context->transcript.message_c);
+		spdm_reset_message_c(spdm_context);
 		return spdm_generate_error_response(spdm_context,
 					     SPDM_ERROR_CODE_UNSPECIFIED, 0,
 					     response_size, response);
@@ -202,6 +210,7 @@ return_status spdm_get_response_challenge_auth(IN void *context,
 	result = spdm_generate_challenge_auth_signature(spdm_context, FALSE,
 							ptr);
 	if (!result) {
+		spdm_reset_message_c(spdm_context);
 		return spdm_generate_error_response(
 			spdm_context, SPDM_ERROR_CODE_UNSPECIFIED,
 			0, response_size, response);
@@ -215,3 +224,5 @@ return_status spdm_get_response_challenge_auth(IN void *context,
 
 	return RETURN_SUCCESS;
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP

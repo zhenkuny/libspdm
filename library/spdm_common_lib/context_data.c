@@ -21,8 +21,9 @@ boolean need_session_info_for_data(IN spdm_data_type_t data_type)
 	case SPDM_DATA_SESSION_MUT_AUTH_REQUESTED:
 	case SPDM_DATA_SESSION_END_SESSION_ATTRIBUTES:
 		return TRUE;
+	default:
+		return FALSE;
 	}
-	return FALSE;
 }
 
 /**
@@ -50,6 +51,10 @@ return_status spdm_set_data(IN void *context, IN spdm_data_type_t data_type,
 	uint8 slot_id;
 	uint8 mut_auth_requested;
 
+	if (!context || !data || data_type >= SPDM_DATA_MAX) {
+		return RETURN_INVALID_PARAMETER;
+	}
+
 	spdm_context = context;
 
 	if (need_session_info_for_data(data_type)) {
@@ -62,6 +67,8 @@ return_status spdm_set_data(IN void *context, IN spdm_data_type_t data_type,
 		if (session_info == NULL) {
 			return RETURN_INVALID_PARAMETER;
 		}
+	} else {
+		session_info = NULL;
 	}
 
 	switch (data_type) {
@@ -71,15 +78,14 @@ return_status spdm_set_data(IN void *context, IN spdm_data_type_t data_type,
 			return RETURN_INVALID_PARAMETER;
 		}
 		if (parameter->location == SPDM_DATA_LOCATION_CONNECTION) {
-			spdm_context->connection_info.version
-				.spdm_version_count = (uint8)(
-				data_size / sizeof(spdm_version_number_t));
-			copy_mem(spdm_context->connection_info.version
-					 .spdm_version,
+			if (data_size != sizeof(spdm_version_number_t)) {
+				/* Only have one connected version */
+				return RETURN_INVALID_PARAMETER;
+			}
+			copy_mem(
+				 &(spdm_context->connection_info.version),
 				 data,
-				 spdm_context->connection_info.version
-						 .spdm_version_count *
-					 sizeof(spdm_version_number_t));
+				 sizeof(spdm_version_number_t));
 		} else {
 			spdm_context->local_context.version.spdm_version_count =
 				(uint8)(data_size /
@@ -98,16 +104,14 @@ return_status spdm_set_data(IN void *context, IN spdm_data_type_t data_type,
 			return RETURN_INVALID_PARAMETER;
 		}
 		if (parameter->location == SPDM_DATA_LOCATION_CONNECTION) {
-			spdm_context->connection_info.secured_message_version
-				.spdm_version_count = (uint8)(
-				data_size / sizeof(spdm_version_number_t));
-			copy_mem(spdm_context->connection_info
-					 .secured_message_version.spdm_version,
+			if (data_size != sizeof(spdm_version_number_t)) {
+				/* Only have one connected version */
+				return RETURN_INVALID_PARAMETER;
+			}
+			copy_mem(
+				 &(spdm_context->connection_info.secured_message_version),
 				 data,
-				 spdm_context->connection_info
-						 .secured_message_version
-						 .spdm_version_count *
-					 sizeof(spdm_version_number_t));
+				 sizeof(spdm_version_number_t));
 		} else {
 			spdm_context->local_context.secured_message_version
 				.spdm_version_count = (uint8)(
@@ -249,10 +253,10 @@ return_status spdm_set_data(IN void *context, IN spdm_data_type_t data_type,
 		}
 		spdm_context->response_state = *(uint32 *)data;
 		break;
-	case SPDM_DATA_PEER_PUBLIC_ROOT_CERT_HASH:
-		spdm_context->local_context.peer_root_cert_hash_provision_size =
+	case SPDM_DATA_PEER_PUBLIC_ROOT_CERT:
+		spdm_context->local_context.peer_root_cert_provision_size =
 			data_size;
-		spdm_context->local_context.peer_root_cert_hash_provision =
+		spdm_context->local_context.peer_root_cert_provision =
 			data;
 		break;
 	case SPDM_DATA_PEER_PUBLIC_CERT_CHAIN:
@@ -360,6 +364,12 @@ return_status spdm_set_data(IN void *context, IN spdm_data_type_t data_type,
 		}
 		session_info->end_session_attributes = *(uint8 *)data;
 		break;
+	case SPDM_DATA_OPAQUE_CONTEXT_DATA:
+		if (data_size != sizeof(void *) || *(void **)data == NULL) {
+			return RETURN_INVALID_PARAMETER;
+		}
+		spdm_context->opaque_context_data_ptr = *(void **)data;
+		break;
 	default:
 		return RETURN_UNSUPPORTED;
 		break;
@@ -397,6 +407,10 @@ return_status spdm_get_data(IN void *context, IN spdm_data_type_t data_type,
 	uint32 session_id;
 	spdm_session_info_t *session_info;
 
+	if (!context || !data || !data_size || data_type >= SPDM_DATA_MAX) {
+		return RETURN_INVALID_PARAMETER;
+	}
+
 	spdm_context = context;
 
 	if (need_session_info_for_data(data_type)) {
@@ -409,6 +423,8 @@ return_status spdm_get_data(IN void *context, IN spdm_data_type_t data_type,
 		if (session_info == NULL) {
 			return RETURN_INVALID_PARAMETER;
 		}
+	} else {
+		session_info = NULL;
 	}
 
 	switch (data_type) {
@@ -416,22 +432,17 @@ return_status spdm_get_data(IN void *context, IN spdm_data_type_t data_type,
 		if (parameter->location != SPDM_DATA_LOCATION_CONNECTION) {
 			return RETURN_INVALID_PARAMETER;
 		}
-		target_data_size = spdm_context->connection_info.version
-					   .spdm_version_count *
-				   sizeof(spdm_version_number_t);
+		target_data_size = sizeof(spdm_version_number_t);
 		target_data =
-			spdm_context->connection_info.version.spdm_version;
+			&(spdm_context->connection_info.version);
 		break;
 	case SPDM_DATA_SECURED_MESSAGE_VERSION:
 		if (parameter->location != SPDM_DATA_LOCATION_CONNECTION) {
 			return RETURN_INVALID_PARAMETER;
 		}
-		target_data_size =
-			spdm_context->connection_info.secured_message_version
-				.spdm_version_count *
-			sizeof(spdm_version_number_t);
-		target_data = spdm_context->connection_info
-				      .secured_message_version.spdm_version;
+		target_data_size = sizeof(spdm_version_number_t);
+		target_data =
+			&(spdm_context->connection_info.secured_message_version);
 		break;
 	case SPDM_DATA_CAPABILITY_FLAGS:
 		target_data_size = sizeof(uint32);
@@ -540,6 +551,10 @@ return_status spdm_get_data(IN void *context, IN spdm_data_type_t data_type,
 		target_data_size = sizeof(uint8);
 		target_data = &session_info->end_session_attributes;
 		break;
+	case SPDM_DATA_OPAQUE_CONTEXT_DATA:
+		target_data_size = sizeof(void *);
+		target_data = &spdm_context->opaque_context_data_ptr;
+		break;
 	default:
 		return RETURN_UNSUPPORTED;
 		break;
@@ -578,7 +593,15 @@ void spdm_reset_message_b(IN void *context)
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	reset_managed_buffer(&spdm_context->transcript.message_b);
+#else
+	if (spdm_context->transcript.digest_context_m1m2 != NULL) {
+		spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2);
+		spdm_context->transcript.digest_context_m1m2 = NULL;
+	}
+#endif
 }
 
 /**
@@ -591,7 +614,15 @@ void spdm_reset_message_c(IN void *context)
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	reset_managed_buffer(&spdm_context->transcript.message_c);
+#else
+	if (spdm_context->transcript.digest_context_m1m2 != NULL) {
+		spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2);
+		spdm_context->transcript.digest_context_m1m2 = NULL;
+	}
+#endif
 }
 
 /**
@@ -604,7 +635,15 @@ void spdm_reset_message_mut_b(IN void *context)
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	reset_managed_buffer(&spdm_context->transcript.message_mut_b);
+#else
+	if (spdm_context->transcript.digest_context_mut_m1m2 != NULL) {
+		spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_mut_m1m2);
+		spdm_context->transcript.digest_context_mut_m1m2 = NULL;
+	}
+#endif
 }
 
 /**
@@ -617,29 +656,165 @@ void spdm_reset_message_mut_c(IN void *context)
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	reset_managed_buffer(&spdm_context->transcript.message_mut_c);
+#else
+	if (spdm_context->transcript.digest_context_mut_m1m2 != NULL) {
+		spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_mut_m1m2);
+		spdm_context->transcript.digest_context_mut_m1m2 = NULL;
+	}
+#endif
 }
 
 /**
   Reset message M cache in SPDM context.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
 **/
-void spdm_reset_message_m(IN void *context)
+void spdm_reset_message_m(IN void *context, IN void *session_info)
 {
 	spdm_context_t *spdm_context;
+	spdm_session_info_t *spdm_session_info;
 
 	spdm_context = context;
-	reset_managed_buffer(&spdm_context->transcript.message_m);
+	spdm_session_info = session_info;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	if (spdm_session_info == NULL) {
+		reset_managed_buffer(&spdm_context->transcript.message_m);
+	} else {
+		reset_managed_buffer(&spdm_session_info->session_transcript.message_m);
+	}
+#else
+	if (spdm_session_info == NULL) {
+		if (spdm_context->transcript.digest_context_l1l2 != NULL) {
+			spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_context->transcript.digest_context_l1l2);
+			spdm_context->transcript.digest_context_l1l2 = NULL;
+	}
+	} else {
+		if (spdm_session_info->session_transcript.digest_context_l1l2 != NULL) {
+			spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_l1l2);
+			spdm_session_info->session_transcript.digest_context_l1l2 = NULL;
+		}
+	}
+#endif
+}
+
+/**
+  Reset message K cache in SPDM context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  spdm_session_info              A pointer to the SPDM session context.
+**/
+void spdm_reset_message_k(IN void *context, IN void *session_info)
+{
+	spdm_session_info_t *spdm_session_info;
+
+	spdm_session_info = session_info;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	reset_managed_buffer(&spdm_session_info->session_transcript.message_k);
+#else
+	{
+		spdm_context_t *spdm_context;
+		void *secured_message_context;
+	
+		spdm_context = context;
+		secured_message_context = spdm_get_secured_message_context_via_session_info (session_info);
+
+		reset_managed_buffer(&spdm_session_info->session_transcript.temp_message_k);
+
+		if (spdm_session_info->session_transcript.digest_context_th != NULL) {
+			spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_th);
+			spdm_session_info->session_transcript.digest_context_th = NULL;
+		}
+		if (spdm_session_info->session_transcript.hmac_rsp_context_th != NULL) {
+			spdm_hmac_free_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_rsp_context_th);
+			spdm_session_info->session_transcript.hmac_rsp_context_th = NULL;
+		}
+		if (spdm_session_info->session_transcript.hmac_req_context_th != NULL) {
+			spdm_hmac_free_with_request_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_req_context_th);
+			spdm_session_info->session_transcript.hmac_req_context_th = NULL;
+		}
+		if (spdm_session_info->session_transcript.digest_context_th_backup != NULL) {
+			spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_th_backup);
+			spdm_session_info->session_transcript.digest_context_th_backup = NULL;
+		}
+		if (spdm_session_info->session_transcript.hmac_rsp_context_th_backup != NULL) {
+			spdm_hmac_free_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_rsp_context_th_backup);
+			spdm_session_info->session_transcript.hmac_rsp_context_th_backup = NULL;
+		}
+		if (spdm_session_info->session_transcript.hmac_req_context_th_backup != NULL) {
+			spdm_hmac_free_with_request_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_req_context_th_backup);
+			spdm_session_info->session_transcript.hmac_req_context_th_backup = NULL;
+		}
+		spdm_session_info->session_transcript.finished_key_ready = FALSE;
+	}
+#endif
+}
+
+/**
+  Reset message F cache in SPDM context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  spdm_session_info              A pointer to the SPDM session context.
+**/
+void spdm_reset_message_f(IN void *context, IN void *session_info)
+{
+	spdm_session_info_t *spdm_session_info;
+
+	spdm_session_info = session_info;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	reset_managed_buffer(&spdm_session_info->session_transcript.message_f);
+#else
+	{
+		spdm_context_t *spdm_context;
+		void *secured_message_context;
+	
+		spdm_context = context;
+		secured_message_context = spdm_get_secured_message_context_via_session_info (session_info);
+
+		if (spdm_session_info->session_transcript.digest_context_th != NULL) {
+			spdm_hash_free (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_th);
+			spdm_session_info->session_transcript.digest_context_th = spdm_session_info->session_transcript.digest_context_th_backup;
+			spdm_session_info->session_transcript.digest_context_th_backup = NULL;
+		}
+		if (spdm_session_info->session_transcript.hmac_rsp_context_th != NULL) {
+			spdm_hmac_free_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_rsp_context_th);
+			spdm_session_info->session_transcript.hmac_rsp_context_th = spdm_session_info->session_transcript.hmac_rsp_context_th_backup;
+			spdm_session_info->session_transcript.hmac_rsp_context_th_backup = NULL;
+		}
+		if (spdm_session_info->session_transcript.hmac_req_context_th != NULL) {
+			spdm_hmac_free_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_req_context_th);
+			spdm_session_info->session_transcript.hmac_req_context_th = spdm_session_info->session_transcript.hmac_req_context_th_backup;
+			spdm_session_info->session_transcript.hmac_req_context_th_backup = NULL;
+		}
+		spdm_session_info->session_transcript.message_f_initialized = FALSE;
+	}
+#endif
 }
 
 /**
   Reset message buffer in SPDM context according to request code.
 
   @param  spdm_context               	A pointer to the SPDM context.
+  @param  spdm_session_info             A pointer to the SPDM session context.
   @param  spdm_request               	The SPDM request code.
 */
-void spdm_reset_message_buffer_via_request_code(IN void *context,
+void spdm_reset_message_buffer_via_request_code(IN void *context, IN void *session_info,
 			       IN uint8 request_code)
 {
 	spdm_context_t *spdm_context;
@@ -649,7 +824,7 @@ void spdm_reset_message_buffer_via_request_code(IN void *context,
 	  Any request other than SPDM_GET_MEASUREMENTS resets L1/L2
 	*/
 	if (request_code != SPDM_GET_MEASUREMENTS) {
-		reset_managed_buffer(&spdm_context->transcript.message_m);
+		spdm_reset_message_m(spdm_context, session_info);
 	}
 	/**
 	  If the Requester issued GET_MEASUREMENTS or KEY_EXCHANGE or FINISH or PSK_EXCHANGE 
@@ -669,17 +844,17 @@ void spdm_reset_message_buffer_via_request_code(IN void *context,
 	case SPDM_END_SESSION:
 		if (spdm_context->connection_info.connection_state <
 			SPDM_CONNECTION_STATE_AUTHENTICATED) {
-			reset_managed_buffer(&spdm_context->transcript.message_b);
-			reset_managed_buffer(&spdm_context->transcript.message_c);
-			reset_managed_buffer(&spdm_context->transcript.message_mut_b);
-			reset_managed_buffer(&spdm_context->transcript.message_mut_c);
+			spdm_reset_message_b(spdm_context);
+			spdm_reset_message_c(spdm_context);
+			spdm_reset_message_mut_b(spdm_context);
+			spdm_reset_message_mut_c(spdm_context);
 		}
 		break;
 	case SPDM_DELIVER_ENCAPSULATED_RESPONSE:
 		if (spdm_context->connection_info.connection_state <
 			SPDM_CONNECTION_STATE_AUTHENTICATED) {
-			reset_managed_buffer(&spdm_context->transcript.message_b);
-			reset_managed_buffer(&spdm_context->transcript.message_c);
+			spdm_reset_message_b(spdm_context);
+			spdm_reset_message_c(spdm_context);
 		}
 		break;
 	default:
@@ -722,8 +897,24 @@ return_status spdm_append_message_b(IN void *context, IN void *message,
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	return append_managed_buffer(&spdm_context->transcript.message_b,
 				     message, message_size);
+#else
+	if (spdm_context->transcript.digest_context_m1m2 == NULL) {
+		spdm_context->transcript.digest_context_m1m2 = spdm_hash_new (
+			spdm_context->connection_info.algorithm.base_hash_algo);
+		spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2);
+		spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2,
+			get_managed_buffer(&spdm_context->transcript.message_a),
+			get_managed_buffer_size(&spdm_context->transcript.message_a));
+	}
+	return spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+		spdm_context->transcript.digest_context_m1m2, message, message_size) ?
+		RETURN_SUCCESS : RETURN_DEVICE_ERROR;
+#endif
 }
 
 /**
@@ -742,8 +933,24 @@ return_status spdm_append_message_c(IN void *context, IN void *message,
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	return append_managed_buffer(&spdm_context->transcript.message_c,
 				     message, message_size);
+#else
+	if (spdm_context->transcript.digest_context_m1m2 == NULL) {
+		spdm_context->transcript.digest_context_m1m2 = spdm_hash_new (
+			spdm_context->connection_info.algorithm.base_hash_algo);
+		spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2);
+		spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2,
+			get_managed_buffer(&spdm_context->transcript.message_a),
+			get_managed_buffer_size(&spdm_context->transcript.message_a));
+	}
+	return spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+		spdm_context->transcript.digest_context_m1m2, message, message_size) ?
+		RETURN_SUCCESS : RETURN_DEVICE_ERROR;
+#endif
 }
 
 /**
@@ -762,8 +969,20 @@ return_status spdm_append_message_mut_b(IN void *context, IN void *message,
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	return append_managed_buffer(&spdm_context->transcript.message_mut_b,
 				     message, message_size);
+#else
+	if (spdm_context->transcript.digest_context_mut_m1m2 == NULL) {
+		spdm_context->transcript.digest_context_mut_m1m2 = spdm_hash_new (
+			spdm_context->connection_info.algorithm.base_hash_algo);
+		spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_mut_m1m2);
+	}
+	return spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+		spdm_context->transcript.digest_context_mut_m1m2, message, message_size) ?
+		RETURN_SUCCESS : RETURN_DEVICE_ERROR;
+#endif
 }
 
 /**
@@ -782,70 +1001,361 @@ return_status spdm_append_message_mut_c(IN void *context, IN void *message,
 	spdm_context_t *spdm_context;
 
 	spdm_context = context;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	return append_managed_buffer(&spdm_context->transcript.message_mut_c,
 				     message, message_size);
+#else
+	if (spdm_context->transcript.digest_context_mut_m1m2 == NULL) {
+		spdm_context->transcript.digest_context_mut_m1m2 = spdm_hash_new (
+			spdm_context->connection_info.algorithm.base_hash_algo);
+		spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_mut_m1m2);
+	}
+	return spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+		spdm_context->transcript.digest_context_mut_m1m2, message, message_size) ?
+		RETURN_SUCCESS : RETURN_DEVICE_ERROR;
+#endif
 }
 
 /**
   Append message M cache in SPDM context.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_m(IN void *context, IN void *message,
-				    IN uintn message_size)
+return_status spdm_append_message_m(IN void *context, IN void *session_info,
+					IN void *message, IN uintn message_size)
 {
 	spdm_context_t *spdm_context;
+	spdm_session_info_t *spdm_session_info;
 
 	spdm_context = context;
-	return append_managed_buffer(&spdm_context->transcript.message_m,
-				     message, message_size);
+	spdm_session_info = session_info;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	if (spdm_session_info == NULL) {
+		return append_managed_buffer(&spdm_context->transcript.message_m,
+								message, message_size);
+	} else {
+		return append_managed_buffer(&spdm_session_info->session_transcript.message_m,
+								message, message_size);
+	}
+#else
+	if (spdm_session_info == NULL) {
+		if (spdm_context->transcript.digest_context_l1l2 == NULL) {
+			spdm_context->transcript.digest_context_l1l2 = spdm_hash_new (
+				spdm_context->connection_info.algorithm.base_hash_algo);
+			spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_context->transcript.digest_context_l1l2);
+		}
+		return spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_l1l2, message, message_size) ?
+			RETURN_SUCCESS : RETURN_DEVICE_ERROR;
+	} else {
+		if (spdm_session_info->session_transcript.digest_context_l1l2 == NULL) {
+			spdm_session_info->session_transcript.digest_context_l1l2 = spdm_hash_new (
+				spdm_context->connection_info.algorithm.base_hash_algo);
+			spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_l1l2);
+		}
+		return spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_session_info->session_transcript.digest_context_l1l2, message, message_size) ?
+			RETURN_SUCCESS : RETURN_DEVICE_ERROR;
+	}
+#endif
 }
 
 /**
   Append message K cache in SPDM context.
 
+  @param  spdm_context                  A pointer to the SPDM context.
   @param  spdm_session_info              A pointer to the SPDM session context.
+  @param  is_requester                  Indicate of the key generation for a requester or a responder.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_k(IN void *session_info, IN void *message,
-				    IN uintn message_size)
+return_status spdm_append_message_k(IN void *context, IN void *session_info,
+            IN boolean is_requester, IN void *message, IN uintn message_size)
 {
 	spdm_session_info_t *spdm_session_info;
 
 	spdm_session_info = session_info;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	return append_managed_buffer(
 		&spdm_session_info->session_transcript.message_k, message,
 		message_size);
+#else
+	{
+		spdm_context_t *spdm_context;
+		void *secured_message_context;
+		uint8 *cert_chain_buffer;
+		uintn cert_chain_buffer_size;
+		boolean result;
+		uint8 cert_chain_buffer_hash[MAX_HASH_SIZE];
+		uint32 hash_size;
+		boolean finished_key_ready;
+
+		spdm_context = context;
+		secured_message_context = spdm_get_secured_message_context_via_session_info (session_info);
+		finished_key_ready = spdm_secured_message_is_finished_key_ready(secured_message_context);
+
+		if (spdm_session_info->session_transcript.digest_context_th == NULL) {
+			if (!spdm_session_info->use_psk) {
+				if (is_requester) {
+					result = spdm_get_peer_cert_chain_buffer(
+						spdm_context, (void **)&cert_chain_buffer, &cert_chain_buffer_size);
+				} else {
+					result = spdm_get_local_cert_chain_buffer(
+						spdm_context, (void **)&cert_chain_buffer, &cert_chain_buffer_size);
+				}
+				if (!result) {
+					return FALSE;
+				}
+				hash_size = spdm_get_hash_size(
+					spdm_context->connection_info.algorithm.base_hash_algo);
+				spdm_hash_all(
+					spdm_context->connection_info.algorithm.base_hash_algo,
+					cert_chain_buffer, cert_chain_buffer_size,
+					cert_chain_buffer_hash);
+			}
+		}
+
+		//
+		// prepare digest_context_th
+		//
+		if (spdm_session_info->session_transcript.digest_context_th == NULL) {
+			spdm_session_info->session_transcript.digest_context_th = spdm_hash_new (
+				spdm_context->connection_info.algorithm.base_hash_algo);
+			spdm_hash_init (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_th);
+			spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_th,
+				get_managed_buffer(&spdm_context->transcript.message_a),
+				get_managed_buffer_size(&spdm_context->transcript.message_a));
+			append_managed_buffer(
+				&spdm_session_info->session_transcript.temp_message_k,
+				get_managed_buffer(&spdm_context->transcript.message_a),
+				get_managed_buffer_size(&spdm_context->transcript.message_a));
+			if (!spdm_session_info->use_psk) {
+				spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+					spdm_session_info->session_transcript.digest_context_th,
+					cert_chain_buffer_hash, hash_size);
+				append_managed_buffer(
+					&spdm_session_info->session_transcript.temp_message_k,
+					cert_chain_buffer_hash, hash_size);
+			}
+		}
+		spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_session_info->session_transcript.digest_context_th, message, message_size);
+		if (!finished_key_ready) {
+			//
+			// append message only if finished_key is NOT ready.
+			//
+			append_managed_buffer(
+				&spdm_session_info->session_transcript.temp_message_k, message, message_size);
+		}
+
+		//
+		// Above action is to calculate HASH for message_k.
+		// However, we cannot use similar way to calculate HMAC. (chicken-egg problem)
+		// HMAC need finished_key, and finished_key calculation need message_k.
+		// If the finished_key is NOT ready, then we cannot calculate HMAC. We have to cache to temp_message_k and stop here.
+		// If the finished_key is ready, then we can start calculating HMAC. No need to cache temp_message_k.
+		//
+		if (!finished_key_ready) {
+			return RETURN_SUCCESS;
+		}
+
+		//
+		// prepare hmac_rsp_context_th
+		//
+		if (spdm_session_info->session_transcript.hmac_rsp_context_th == NULL) {
+			spdm_session_info->session_transcript.hmac_rsp_context_th = spdm_hmac_new_with_response_finished_key (
+				secured_message_context);
+			spdm_hmac_init_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_rsp_context_th);
+			spdm_hmac_update_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_rsp_context_th,
+				get_managed_buffer(&spdm_session_info->session_transcript.temp_message_k),
+				get_managed_buffer_size(&spdm_session_info->session_transcript.temp_message_k));
+		}
+		spdm_hmac_update_with_response_finished_key (secured_message_context,
+			spdm_session_info->session_transcript.hmac_rsp_context_th, message, message_size);
+
+		//
+		// prepare hmac_req_context_th
+		//
+		if (spdm_session_info->session_transcript.hmac_req_context_th == NULL) {
+			spdm_session_info->session_transcript.hmac_req_context_th = spdm_hmac_new_with_request_finished_key (
+				secured_message_context);
+			spdm_hmac_init_with_request_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_req_context_th);
+			spdm_hmac_update_with_request_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_req_context_th,
+				get_managed_buffer(&spdm_session_info->session_transcript.temp_message_k),
+				get_managed_buffer_size(&spdm_session_info->session_transcript.temp_message_k));
+		}
+		spdm_hmac_update_with_request_finished_key (secured_message_context,
+			spdm_session_info->session_transcript.hmac_req_context_th, message, message_size);
+		return RETURN_SUCCESS;
+	}
+#endif
 }
 
 /**
   Append message F cache in SPDM context.
 
+  @param  spdm_context                  A pointer to the SPDM context.
   @param  spdm_session_info              A pointer to the SPDM session context.
+  @param  is_requester                  Indicate of the key generation for a requester or a responder.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_f(IN void *session_info, IN void *message,
-				    IN uintn message_size)
+return_status spdm_append_message_f(IN void *context, IN void *session_info, 
+            IN boolean is_requester, IN void *message, IN uintn message_size)
 {
 	spdm_session_info_t *spdm_session_info;
 
 	spdm_session_info = session_info;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	return append_managed_buffer(
 		&spdm_session_info->session_transcript.message_f, message,
 		message_size);
+#else
+	{
+		spdm_context_t *spdm_context;
+		void *secured_message_context;
+		uint8 *mut_cert_chain_buffer;
+		uintn mut_cert_chain_buffer_size;
+		boolean result;
+		uint8 mut_cert_chain_buffer_hash[MAX_HASH_SIZE];
+		uint32 hash_size;
+		boolean finished_key_ready;
+
+		spdm_context = context;
+		secured_message_context = spdm_get_secured_message_context_via_session_info (session_info);
+		finished_key_ready = spdm_secured_message_is_finished_key_ready(secured_message_context);
+		ASSERT (finished_key_ready);
+
+		if (!spdm_session_info->session_transcript.message_f_initialized) {
+			//
+			// digest_context_th might be NULL in unit test, where message_k is hardcoded.
+			// hmac_{rsp,req}_context_th might be NULL in real case, because
+			//   after finished_key_ready is generated, no one trigger spdm_append_message_k.
+			// trigger message_k to initialize by using zero length message_k, no impact to hash or HMAC.
+			//   only temp_message_k is appended.
+			//
+			if (spdm_session_info->session_transcript.digest_context_th == NULL ||
+				spdm_session_info->session_transcript.hmac_rsp_context_th == NULL ||
+				spdm_session_info->session_transcript.hmac_req_context_th == NULL) {
+				spdm_append_message_k (context, session_info, is_requester, NULL, 0);
+			}
+
+			if (!spdm_session_info->use_psk && spdm_session_info->mut_auth_requested) {
+				if (is_requester) {
+					result = spdm_get_local_cert_chain_buffer(
+						spdm_context,
+						(void **)&mut_cert_chain_buffer,
+						&mut_cert_chain_buffer_size);
+				} else {
+					result = spdm_get_peer_cert_chain_buffer(
+						spdm_context,
+						(void **)&mut_cert_chain_buffer,
+						&mut_cert_chain_buffer_size);
+				}
+				if (!result) {
+					return RETURN_UNSUPPORTED;
+				}
+
+				hash_size = spdm_get_hash_size(
+					spdm_context->connection_info.algorithm.base_hash_algo);
+				spdm_hash_all(
+					spdm_context->connection_info.algorithm.base_hash_algo,
+					mut_cert_chain_buffer, mut_cert_chain_buffer_size,
+					mut_cert_chain_buffer_hash);
+			}
+
+			//
+			// It is first time call, backup current message_k context
+			// this backup will be used in reset_message_f.
+			//
+			ASSERT (spdm_session_info->session_transcript.digest_context_th != NULL);
+			spdm_session_info->session_transcript.digest_context_th_backup = spdm_hash_new (
+				spdm_context->connection_info.algorithm.base_hash_algo);
+			spdm_hash_duplicate (spdm_context->connection_info.algorithm.base_hash_algo,
+				spdm_session_info->session_transcript.digest_context_th,
+				spdm_session_info->session_transcript.digest_context_th_backup);
+
+			ASSERT (spdm_session_info->session_transcript.hmac_rsp_context_th != NULL);
+			spdm_session_info->session_transcript.hmac_rsp_context_th_backup = spdm_hmac_new_with_response_finished_key (
+				secured_message_context);
+			spdm_hmac_duplicate_with_response_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_rsp_context_th,
+				spdm_session_info->session_transcript.hmac_rsp_context_th_backup);
+
+			ASSERT (spdm_session_info->session_transcript.hmac_req_context_th != NULL);
+			spdm_session_info->session_transcript.hmac_req_context_th_backup = spdm_hmac_new_with_request_finished_key (
+				secured_message_context);
+			spdm_hmac_duplicate_with_request_finished_key (secured_message_context,
+				spdm_session_info->session_transcript.hmac_req_context_th,
+				spdm_session_info->session_transcript.hmac_req_context_th_backup);
+		}
+
+		//
+		// prepare digest_context_th
+		//
+		ASSERT (spdm_session_info->session_transcript.digest_context_th != NULL);
+		if (!spdm_session_info->session_transcript.message_f_initialized) {
+			if (!spdm_session_info->use_psk && spdm_session_info->mut_auth_requested) {
+				spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+					spdm_session_info->session_transcript.digest_context_th, mut_cert_chain_buffer_hash, hash_size);
+			}
+		}
+		spdm_hash_update (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_session_info->session_transcript.digest_context_th, message, message_size);
+
+		//
+		// prepare hmac_rsp_context_th
+		//
+		ASSERT (spdm_session_info->session_transcript.hmac_rsp_context_th != NULL);
+		if (!spdm_session_info->session_transcript.message_f_initialized) {
+			if (!spdm_session_info->use_psk && spdm_session_info->mut_auth_requested) {
+				spdm_hmac_update_with_response_finished_key (secured_message_context,
+					spdm_session_info->session_transcript.hmac_rsp_context_th, mut_cert_chain_buffer_hash, hash_size);
+			}
+		}
+		spdm_hmac_update_with_response_finished_key (secured_message_context,
+			spdm_session_info->session_transcript.hmac_rsp_context_th, message, message_size);
+
+		//
+		// prepare hmac_req_context_th
+		//
+		ASSERT (spdm_session_info->session_transcript.hmac_req_context_th != NULL);
+		if (!spdm_session_info->session_transcript.message_f_initialized) {
+			if (!spdm_session_info->use_psk && spdm_session_info->mut_auth_requested) {
+				spdm_hmac_update_with_request_finished_key (secured_message_context,
+					spdm_session_info->session_transcript.hmac_req_context_th, mut_cert_chain_buffer_hash, hash_size);
+			}
+		}
+		spdm_hmac_update_with_request_finished_key (secured_message_context,
+			spdm_session_info->session_transcript.hmac_req_context_th, message, message_size);
+
+		spdm_session_info->session_transcript.message_f_initialized = TRUE;
+		return RETURN_SUCCESS;
+	}
+#endif
 }
 
 /**
@@ -860,25 +1370,19 @@ return_status spdm_append_message_f(IN void *session_info, IN void *message,
 boolean spdm_is_version_supported(IN spdm_context_t *spdm_context,
 				  IN uint8 version)
 {
-	uintn index;
 	uint8 major_version;
 	uint8 minor_version;
 
 	major_version = ((version >> 4) & 0xF);
 	minor_version = (version & 0xF);
 
-	for (index = 0;
-	     index < spdm_context->connection_info.version.spdm_version_count;
-	     index++) {
-		if ((major_version ==
-		     spdm_context->connection_info.version.spdm_version[index]
-			     .major_version) &&
-		    (minor_version ==
-		     spdm_context->connection_info.version.spdm_version[index]
-			     .minor_version)) {
-			return TRUE;
-		}
+	if ((major_version ==
+			spdm_context->connection_info.version.major_version) &&
+		(minor_version ==
+			spdm_context->connection_info.version.minor_version)) {
+		return TRUE;
 	}
+
 	return FALSE;
 }
 
@@ -1034,17 +1538,19 @@ void spdm_init_context(IN void *context)
 	zero_mem(spdm_context, sizeof(spdm_context_t));
 	spdm_context->version = spdm_context_struct_VERSION;
 	spdm_context->transcript.message_a.max_buffer_size =
-		MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE;
+		sizeof(spdm_context->transcript.message_a.buffer);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	spdm_context->transcript.message_b.max_buffer_size =
-		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+		sizeof(spdm_context->transcript.message_b.buffer);
 	spdm_context->transcript.message_c.max_buffer_size =
-		MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE;
+		sizeof(spdm_context->transcript.message_c.buffer);
 	spdm_context->transcript.message_mut_b.max_buffer_size =
-		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+		sizeof(spdm_context->transcript.message_mut_b.buffer);
 	spdm_context->transcript.message_mut_c.max_buffer_size =
-		MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE;
+		sizeof(spdm_context->transcript.message_mut_c.buffer);
 	spdm_context->transcript.message_m.max_buffer_size =
-		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+		sizeof(spdm_context->transcript.message_m.buffer);
+#endif
 	spdm_context->retry_times = MAX_SPDM_REQUEST_RETRY_TIMES;
 	spdm_context->response_state = SPDM_RESPONSE_STATE_NORMAL;
 	spdm_context->current_token = 0;
@@ -1070,7 +1576,7 @@ void spdm_init_context(IN void *context)
 	spdm_context->local_context.secured_message_version.spdm_version[0]
 		.update_version_number = 0;
 	spdm_context->encap_context.certificate_chain_buffer.max_buffer_size =
-		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+		sizeof(spdm_context->encap_context.certificate_chain_buffer.buffer);
 
 	secured_message_context = (void *)((uintn)(spdm_context + 1));
 	SecuredMessageContextSize = spdm_secured_message_get_context_size();
@@ -1114,7 +1620,8 @@ void spdm_reset_context(IN void *context)
 	spdm_context->last_spdm_request_session_id = INVALID_SESSION_ID;
 	spdm_context->last_spdm_request_session_id_valid = FALSE;
 	spdm_context->last_spdm_request_size = 0;
-	spdm_context->encap_context.certificate_chain_buffer.max_buffer_size = MAX_SPDM_MESSAGE_BUFFER_SIZE;
+	spdm_context->encap_context.certificate_chain_buffer.max_buffer_size =
+		sizeof(spdm_context->encap_context.certificate_chain_buffer.buffer);
 	for (index = 0; index < MAX_SPDM_SESSION_COUNT; index++)
 	{
 		spdm_session_info_init(spdm_context,
@@ -1132,4 +1639,17 @@ uintn spdm_get_context_size(void)
 {
 	return sizeof(spdm_context_t) +
 	       spdm_secured_message_get_context_size() * MAX_SPDM_SESSION_COUNT;
+}
+
+/**
+  Return the SPDMversion field of the version number struct.
+
+  @param  ver				Spdm version number struct.
+
+  @return the SPDMversion of the version number struct.
+**/
+uint8 spdm_get_version_from_version_number(IN spdm_version_number_t ver)
+{
+	return (uint8)(ver.major_version << 4 |
+				   ver.minor_version);
 }

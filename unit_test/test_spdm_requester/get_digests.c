@@ -7,6 +7,8 @@
 #include "spdm_unit_test.h"
 #include <spdm_requester_lib_internal.h>
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 static uint8 m_local_certificate_chain[MAX_SPDM_MESSAGE_BUFFER_SIZE];
 
 return_status spdm_requester_get_digests_test_send_message(
@@ -87,7 +89,7 @@ return_status spdm_requester_get_digests_test_receive_message(
 			->connection_info.algorithm.base_hash_algo =
 			m_use_hash_algo;
 		temp_buf_size = sizeof(spdm_digest_response_t) +
-				spdm_get_hash_size(m_use_hash_algo);
+				spdm_get_hash_size(m_use_hash_algo) * MAX_SPDM_SLOT_COUNT;
 		spdm_response = (void *)temp_buf;
 
 		spdm_response->header.spdm_version = SPDM_MESSAGE_VERSION_10;
@@ -98,9 +100,12 @@ return_status spdm_requester_get_digests_test_receive_message(
 			(uint8)(0xFF));
 
 		digest = (void *)(spdm_response + 1);
+		//send all eight certchains digest
+		//but only No.7 is right
+		digest += spdm_get_hash_size(m_use_hash_algo) * (MAX_SPDM_SLOT_COUNT - 2);
 		spdm_hash_all(m_use_hash_algo, m_local_certificate_chain,
 			      MAX_SPDM_MESSAGE_BUFFER_SIZE, &digest[0]);
-		spdm_response->header.param2 |= (1 << 0);
+		spdm_response->header.param2 |= (0xFF << 0);
 
 		spdm_transport_test_encode_message(spdm_context, NULL, FALSE,
 						   FALSE, temp_buf_size,
@@ -659,13 +664,15 @@ void test_spdm_requester_get_digests_case1(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
+#endif
 }
 
 /**
@@ -695,21 +702,25 @@ void test_spdm_requester_get_digests_case2(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	spdm_context->transcript.message_m.buffer_size =
 							spdm_context->transcript.message_m.max_buffer_size;
+#endif
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_SUCCESS);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(
 		spdm_context->transcript.message_b.buffer_size,
 		sizeof(spdm_get_digest_request_t) +
 			sizeof(spdm_digest_response_t) +
 			spdm_get_hash_size(spdm_context->connection_info
-						   .algorithm.base_hash_algo));
+						   .algorithm.base_hash_algo) * MAX_SPDM_SLOT_COUNT);
 	assert_int_equal(spdm_context->transcript.message_m.buffer_size, 0);
+#endif
 }
 
 /**
@@ -740,13 +751,15 @@ void test_spdm_requester_get_digests_case3(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_UNSUPPORTED);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
+#endif
 }
 
 /**
@@ -776,13 +789,15 @@ void test_spdm_requester_get_digests_case4(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
+#endif
 }
 
 /**
@@ -812,13 +827,15 @@ void test_spdm_requester_get_digests_case5(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_NO_RESPONSE);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
+#endif
 }
 
 /**
@@ -849,18 +866,20 @@ void test_spdm_requester_get_digests_case6(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_SUCCESS);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(
 		spdm_context->transcript.message_b.buffer_size,
 		sizeof(spdm_get_digest_request_t) +
 			sizeof(spdm_digest_response_t) +
 			spdm_get_hash_size(spdm_context->connection_info
 						   .algorithm.base_hash_algo));
+#endif
 }
 
 /**
@@ -891,7 +910,7 @@ void test_spdm_requester_get_digests_case7(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
@@ -899,7 +918,9 @@ void test_spdm_requester_get_digests_case7(void **state)
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
 	assert_int_equal(spdm_context->connection_info.connection_state,
 			 SPDM_CONNECTION_STATE_NOT_STARTED);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
+#endif
 }
 
 /**
@@ -930,7 +951,7 @@ void test_spdm_requester_get_digests_case8(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
@@ -966,18 +987,20 @@ void test_spdm_requester_get_digests_case9(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_SUCCESS);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(
 		spdm_context->transcript.message_b.buffer_size,
 		sizeof(spdm_get_digest_request_t) +
 			sizeof(spdm_digest_response_t) +
 			spdm_get_hash_size(spdm_context->connection_info
 						   .algorithm.base_hash_algo));
+#endif
 }
 
 /**
@@ -1007,13 +1030,15 @@ void test_spdm_requester_get_digests_case10(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_UNSUPPORTED);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
+#endif
 }
 
 /**
@@ -1043,14 +1068,16 @@ void test_spdm_requester_get_digests_case11(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 0);
+#endif
 }
 
 /**
@@ -1081,14 +1108,16 @@ void test_spdm_requester_get_digests_case12(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 sizeof(spdm_get_digest_request_t));
+#endif
 }
 
 /**
@@ -1118,14 +1147,16 @@ void test_spdm_requester_get_digests_case13(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 0);
+#endif
 }
 
 /**
@@ -1155,14 +1186,16 @@ void test_spdm_requester_get_digests_case14(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 0);
+#endif
 }
 
 /**
@@ -1193,8 +1226,10 @@ void test_spdm_requester_get_digests_case15(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	spdm_context->transcript.message_b.buffer_size =
 		spdm_context->transcript.message_b.max_buffer_size;
+#endif
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
@@ -1229,14 +1264,18 @@ void test_spdm_requester_get_digests_case16(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	spdm_context->transcript.message_b.buffer_size =
 		spdm_context->transcript.message_b.max_buffer_size -
 		(sizeof(spdm_digest_response_t));
+#endif
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(status, RETURN_SECURITY_VIOLATION);
+#endif
 }
 
 /**
@@ -1266,7 +1305,7 @@ void test_spdm_requester_get_digests_case17(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
@@ -1304,14 +1343,16 @@ void test_spdm_requester_get_digests_case18(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 0);
+#endif
 }
 
 /**
@@ -1341,7 +1382,7 @@ void test_spdm_requester_get_digests_case19(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
@@ -1379,14 +1420,16 @@ void test_spdm_requester_get_digests_case20(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 sizeof(spdm_get_digest_request_t));
+#endif
 }
 
 /**
@@ -1417,14 +1460,16 @@ void test_spdm_requester_get_digests_case21(void **state)
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	set_mem(m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE,
 		(uint8)(0xFF));
-	spdm_context->transcript.message_b.buffer_size = 0;
+	spdm_reset_message_b(spdm_context);
 
 	zero_mem(total_digest_buffer, sizeof(total_digest_buffer));
 	status =
 		spdm_get_digest(spdm_context, &slot_mask, &total_digest_buffer);
 	assert_int_equal(status, RETURN_DEVICE_ERROR);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size,
 			 sizeof(spdm_get_digest_request_t));
+#endif
 }
 
 /**
@@ -1455,14 +1500,16 @@ void test_spdm_requester_get_digests_case22(void **state) {
   error_code = SPDM_ERROR_CODE_RESERVED_00;
   while(error_code <= 0xff) {
     spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_NEGOTIATED;
-    spdm_context->transcript.message_b.buffer_size = 0;
+    spdm_reset_message_b(spdm_context);
     
     zero_mem (total_digest_buffer, sizeof(total_digest_buffer));
     status = spdm_get_digest (spdm_context, &slot_mask, &total_digest_buffer);
     // assert_int_equal (status, RETURN_DEVICE_ERROR);
     // assert_int_equal (spdm_context->transcript.message_b.buffer_size, 0);
     ASSERT_INT_EQUAL_CASE (status, RETURN_DEVICE_ERROR, error_code);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
     ASSERT_INT_EQUAL_CASE (spdm_context->transcript.message_b.buffer_size, 0, error_code);
+#endif
 
     error_code++;
     if(error_code == SPDM_ERROR_CODE_BUSY) { //busy is treated in cases 5 and 6
@@ -1541,3 +1588,5 @@ int spdm_requester_get_digests_test_main(void)
 				      spdm_unit_test_group_setup,
 				      spdm_unit_test_group_teardown);
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP

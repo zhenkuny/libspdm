@@ -46,12 +46,19 @@ typedef struct {
 } spdm_encap_response_struct_t;
 
 spdm_encap_response_struct_t m_encap_response_struct[] = {
+	#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 	{ SPDM_GET_DIGESTS, spdm_get_encap_request_get_digest,
 	  spdm_process_encap_response_digest },
+
 	{ SPDM_GET_CERTIFICATE, spdm_get_encap_request_get_certificate,
 	  spdm_process_encap_response_certificate },
+	#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+	#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
 	{ SPDM_CHALLENGE, spdm_get_encap_request_challenge,
 	  spdm_process_encap_response_challenge_auth },
+	#endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
 	{ SPDM_KEY_UPDATE, spdm_get_encap_request_key_update,
 	  spdm_process_encap_response_key_update },
 };
@@ -198,8 +205,8 @@ void spdm_init_mut_auth_encap_state(IN spdm_context_t *spdm_context,
 	//
 	// Clear Cache
 	//
-	reset_managed_buffer(&spdm_context->transcript.message_mut_b);
-	reset_managed_buffer(&spdm_context->transcript.message_mut_c);
+	spdm_reset_message_mut_b(spdm_context);
+	spdm_reset_message_mut_c(spdm_context);
 
 	//
 	// Possible Sequence:
@@ -252,8 +259,8 @@ void spdm_init_basic_mut_auth_encap_state(IN spdm_context_t *spdm_context,
 	//
 	// Clear Cache
 	//
-	reset_managed_buffer(&spdm_context->transcript.message_mut_b);
-	reset_managed_buffer(&spdm_context->transcript.message_mut_c);
+	spdm_reset_message_mut_b(spdm_context);
+	spdm_reset_message_mut_c(spdm_context);
 
 	//
 	// Possible Sequence:
@@ -308,8 +315,8 @@ void spdm_init_key_update_encap_state(IN void *context)
 	spdm_context->encap_context.certificate_chain_buffer.buffer_size = 0;
 	spdm_context->response_state = SPDM_RESPONSE_STATE_PROCESSING_ENCAP;
 
-	reset_managed_buffer(&spdm_context->transcript.message_mut_b);
-	reset_managed_buffer(&spdm_context->transcript.message_mut_c);
+	spdm_reset_message_mut_b(spdm_context);
+	spdm_reset_message_mut_c(spdm_context);
 
 	zero_mem(spdm_context->encap_context.request_op_code_sequence,
 		 sizeof(spdm_context->encap_context.request_op_code_sequence));
@@ -381,7 +388,7 @@ return_status spdm_get_response_encapsulated_request(
 		return RETURN_SUCCESS;
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	ASSERT(*response_size > sizeof(spdm_encapsulated_request_response_t));
@@ -522,7 +529,7 @@ return_status spdm_get_response_encapsulated_response_ack(
 		return RETURN_SUCCESS;
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	status = spdm_process_encapsulated_response(
@@ -561,27 +568,16 @@ return_status spdm_get_response_encapsulated_response_ack(
   This function handles the encap error response.
 
   @param  spdm_context                  A pointer to the SPDM context.
-  @param  managed_buffer_t                The managed buffer to be shrinked.
-  @param  shrink_buffer_size             The size in bytes of the size of the buffer to be shrinked.
   @param  error_code                    Indicate the error code.
 
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
 **/
 return_status spdm_handle_encap_error_response_main(
-	IN spdm_context_t *spdm_context, IN OUT void *m_buffer,
-	IN uintn shrink_buffer_size, IN uint8 error_code)
+	IN spdm_context_t *spdm_context, IN uint8 error_code)
 {
 	//
 	// According to "Timing Specification for SPDM messages", RESPONSE_NOT_READY is only for responder.
 	// RESPONSE_NOT_READY should not be sent by requester. No need to check it.
 	//
-
-	//
-	// No need to shrink message_mut_b and message_mut_c, because any error will terminate the ENCAP MUT AUTH.
-	// The sequence is fixed in CHALLENG_AUTH or KEY_EXCHANGE_RSP, the responder cannot issue encap request again.
-	// If the requester restarts the mutual auth via CHALLENG or KEY_EXCHANGE, the encap will also restart.
-	// Do it here just to align with requester.
-	//
-	shrink_managed_buffer(m_buffer, shrink_buffer_size);
 	return RETURN_DEVICE_ERROR;
 }

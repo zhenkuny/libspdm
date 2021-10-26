@@ -123,6 +123,34 @@ return_status spdm_get_certificate(IN void *spdm_context, IN uint8 slot_id,
 
   @param  spdm_context                  A pointer to the SPDM context.
   @param  slot_id                      The number of slot for the certificate chain.
+  @param  cert_chain_size                On input, indicate the size in bytes of the destination buffer to store the digest buffer.
+                                       On output, indicate the size in bytes of the certificate chain.
+  @param  cert_chain                    A pointer to a destination buffer to store the certificate chain.
+  @param  trust_anchor                  A buffer to hold the trust_anchor which is used to validate the peer certificate, if not NULL.
+  @param  trust_anchor_size             A buffer to hold the trust_anchor_size, if not NULL.
+
+  @retval RETURN_SUCCESS               The certificate chain is got successfully.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+  @retval RETURN_SECURITY_VIOLATION    Any verification fails.
+**/
+return_status spdm_get_certificate_ex(IN void *context, IN uint8 slot_id,
+				   IN OUT uintn *cert_chain_size,
+				   OUT void *cert_chain,
+				   OUT void **trust_anchor OPTIONAL,
+				   OUT uintn *trust_anchor_size OPTIONAL);
+
+/**
+  This function sends GET_CERTIFICATE
+  to get certificate chain in one slot from device.
+
+  This function verify the integrity of the certificate chain.
+  root_hash -> Root certificate -> Intermediate certificate -> Leaf certificate.
+
+  If the peer root certificate hash is deployed,
+  this function also verifies the digest with the root hash in the certificate chain.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  slot_id                      The number of slot for the certificate chain.
   @param  length                       MAX_SPDM_CERT_CHAIN_BLOCK_LEN.
   @param  cert_chain_size                On input, indicate the size in bytes of the destination buffer to store the digest buffer.
                                        On output, indicate the size in bytes of the certificate chain.
@@ -137,6 +165,37 @@ return_status spdm_get_certificate_choose_length(IN void *spdm_context,
 						 IN uint16 length,
 						 IN OUT uintn *cert_chain_size,
 						 OUT void *cert_chain);
+
+/**
+  This function sends GET_CERTIFICATE
+  to get certificate chain in one slot from device.
+
+  This function verify the integrity of the certificate chain.
+  root_hash -> Root certificate -> Intermediate certificate -> Leaf certificate.
+
+  If the peer root certificate hash is deployed,
+  this function also verifies the digest with the root hash in the certificate chain.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  slot_id                      The number of slot for the certificate chain.
+  @param  length                       MAX_SPDM_CERT_CHAIN_BLOCK_LEN.
+  @param  cert_chain_size                On input, indicate the size in bytes of the destination buffer to store the digest buffer.
+                                       On output, indicate the size in bytes of the certificate chain.
+  @param  cert_chain                    A pointer to a destination buffer to store the certificate chain.
+  @param  trust_anchor                  A buffer to hold the trust_anchor which is used to validate the peer certificate, if not NULL.
+  @param  trust_anchor_size             A buffer to hold the trust_anchor_size, if not NULL.
+
+  @retval RETURN_SUCCESS               The certificate chain is got successfully.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+  @retval RETURN_SECURITY_VIOLATION    Any verification fails.
+**/
+return_status spdm_get_certificate_choose_length_ex(IN void *context,
+						 IN uint8 slot_id,
+						 IN uint16 length,
+						 IN OUT uintn *cert_chain_size,
+						 OUT void *cert_chain,
+						 OUT void **trust_anchor OPTIONAL,
+						 OUT uintn *trust_anchor_size OPTIONAL);
 
 /**
   This function sends CHALLENGE
@@ -159,6 +218,34 @@ return_status spdm_get_certificate_choose_length(IN void *spdm_context,
 return_status spdm_challenge(IN void *spdm_context, IN uint8 slot_id,
 			     IN uint8 measurement_hash_type,
 			     OUT void *measurement_hash);
+
+/**
+  This function sends CHALLENGE
+  to authenticate the device based upon the key in one slot.
+
+  This function verifies the signature in the challenge auth.
+
+  If basic mutual authentication is requested from the responder,
+  this function also perform the basic mutual authentication.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  slot_id                      The number of slot for the challenge.
+  @param  measurement_hash_type          The type of the measurement hash.
+  @param  measurement_hash              A pointer to a destination buffer to store the measurement hash.
+  @param  requester_nonce_in            A buffer to hold the requester nonce (32 bytes) as input, if not NULL.
+  @param  requester_nonce               A buffer to hold the requester nonce (32 bytes), if not NULL.
+  @param  responder_nonce               A buffer to hold the responder nonce (32 bytes), if not NULL.
+
+  @retval RETURN_SUCCESS               The challenge auth is got successfully.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+  @retval RETURN_SECURITY_VIOLATION    Any verification fails.
+**/
+return_status spdm_challenge_ex(IN void *context, IN uint8 slot_id,
+			     IN uint8 measurement_hash_type,
+			     OUT void *measurement_hash,
+			     IN void *requester_nonce_in OPTIONAL,
+			     OUT void *requester_nonce OPTIONAL,
+			     OUT void *responder_nonce OPTIONAL);
 
 /**
   This function sends GET_MEASUREMENT
@@ -191,6 +278,42 @@ return_status spdm_get_measurement(IN void *spdm_context, IN uint32 *session_id,
 				   OUT void *measurement_record);
 
 /**
+  This function sends GET_MEASUREMENT
+  to get measurement from the device.
+
+  If the signature is requested, this function verifies the signature of the measurement.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_id                    Indicates if it is a secured message protected via SPDM session.
+                                       If session_id is NULL, it is a normal message.
+                                       If session_id is NOT NULL, it is a secured message.
+  @param  request_attribute             The request attribute of the request message.
+  @param  measurement_operation         The measurement operation of the request message.
+  @param  slot_id                      The number of slot for the certificate chain.
+  @param  number_of_blocks               The number of blocks of the measurement record.
+  @param  measurement_record_length      On input, indicate the size in bytes of the destination buffer to store the measurement record.
+                                       On output, indicate the size in bytes of the measurement record.
+  @param  measurement_record            A pointer to a destination buffer to store the measurement record.
+  @param  requester_nonce_in            A buffer to hold the requester nonce (32 bytes) as input, if not NULL.
+  @param  requester_nonce               A buffer to hold the requester nonce (32 bytes), if not NULL.
+  @param  responder_nonce               A buffer to hold the responder nonce (32 bytes), if not NULL.
+
+  @retval RETURN_SUCCESS               The measurement is got successfully.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+  @retval RETURN_SECURITY_VIOLATION    Any verification fails.
+**/
+return_status spdm_get_measurement_ex(IN void *context, IN uint32 *session_id,
+				   IN uint8 request_attribute,
+				   IN uint8 measurement_operation,
+				   IN uint8 slot_id_param,
+				   OUT uint8 *number_of_blocks,
+				   IN OUT uint32 *measurement_record_length,
+				   OUT void *measurement_record,
+			     IN void *requester_nonce_in OPTIONAL,
+				   OUT void *requester_nonce OPTIONAL,
+				   OUT void *responder_nonce OPTIONAL);
+
+/**
   This function sends KEY_EXCHANGE/FINISH or PSK_EXCHANGE/PSK_FINISH
   to start an SPDM Session.
 
@@ -215,6 +338,53 @@ return_status spdm_start_session(IN void *spdm_context, IN boolean use_psk,
 				 IN uint8 slot_id, OUT uint32 *session_id,
 				 OUT uint8 *heartbeat_period,
 				 OUT void *measurement_hash);
+
+/**
+  This function sends KEY_EXCHANGE/FINISH or PSK_EXCHANGE/PSK_FINISH
+  to start an SPDM Session.
+
+  If encapsulated mutual authentication is requested from the responder,
+  this function also perform the encapsulated mutual authentication.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  use_psk                       FALSE means to use KEY_EXCHANGE/FINISH to start a session.
+                                       TRUE means to use PSK_EXCHANGE/PSK_FINISH to start a session.
+  @param  measurement_hash_type          The type of the measurement hash.
+  @param  slot_id                      The number of slot for the certificate chain.
+  @param  session_id                    The session ID of the session.
+  @param  heartbeat_period              The heartbeat period for the session.
+  @param  measurement_hash              A pointer to a destination buffer to store the measurement hash.
+  @param  requester_random_in           A buffer to hold the requester random as input, if not NULL.
+  @param  requester_random_in_size      The size of requester_random_in.
+                                        If use_psk is FALSE, it must be 32 bytes.
+                                        If use_psk is TRUE, it means the PSK context and must be 32 bytes at least,
+                                        but not exceed DEFAULT_CONTEXT_LENGTH.
+  @param  requester_random              A buffer to hold the requester random, if not NULL.
+  @param  requester_random_size         On input, the size of requester_random buffer.
+                                        On output, the size of data returned in requester_random buffer.
+                                        If use_psk is FALSE, it must be 32 bytes.
+                                        If use_psk is TRUE, it means the PSK context and must be 32 bytes at least.
+  @param  responder_random              A buffer to hold the responder random, if not NULL.
+  @param  responder_random_size         On input, the size of requester_random buffer.
+                                        On output, the size of data returned in requester_random buffer.
+                                        If use_psk is FALSE, it must be 32 bytes.
+                                        If use_psk is TRUE, it means the PSK context. It could be 0 if device does not support context.
+
+  @retval RETURN_SUCCESS               The SPDM session is started.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+  @retval RETURN_SECURITY_VIOLATION    Any verification fails.
+**/
+return_status spdm_start_session_ex(IN void *spdm_context, IN boolean use_psk,
+				 IN uint8 measurement_hash_type,
+				 IN uint8 slot_id, OUT uint32 *session_id,
+				 OUT uint8 *heartbeat_period,
+				 OUT void *measurement_hash,
+				 IN void *requester_random_in OPTIONAL,
+				 IN uintn requester_random_in_size OPTIONAL,
+				 OUT void *requester_random OPTIONAL,
+				 OUT uintn *requester_random_size OPTIONAL,
+				 OUT void *responder_random OPTIONAL,
+				 OUT uintn *responder_random_size OPTIONAL);
 
 /**
   This function sends END_SESSION

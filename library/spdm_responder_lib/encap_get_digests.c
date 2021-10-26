@@ -6,6 +6,8 @@
 
 #include "spdm_responder_lib_internal.h"
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 /**
   Get the SPDM encapsulated GET_DIGESTS request.
 
@@ -40,7 +42,7 @@ spdm_get_encap_request_get_digest(IN spdm_context_t *spdm_context,
 
 	spdm_request = encap_request;
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	if (spdm_is_version_supported(spdm_context, SPDM_MESSAGE_VERSION_11)) {
@@ -102,8 +104,7 @@ return_status spdm_process_encap_response_digest(
 	}
 	if (spdm_response->header.request_response_code == SPDM_ERROR) {
 		status = spdm_handle_encap_error_response_main(
-			spdm_context, &spdm_context->transcript.message_mut_b,
-			spdm_context->encap_context.last_encap_request_size,
+			spdm_context,
 			spdm_response->header.param1);
 		if (RETURN_ERROR(status)) {
 			return status;
@@ -146,7 +147,7 @@ return_status spdm_process_encap_response_digest(
 	}
 
 	result = spdm_verify_peer_digests(spdm_context, digest,
-					  digest_count * digest_size);
+					  digest_count);
 	if (!result) {
 		return RETURN_SECURITY_VIOLATION;
 	}
@@ -155,3 +156,5 @@ return_status spdm_process_encap_response_digest(
 
 	return RETURN_SUCCESS;
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP

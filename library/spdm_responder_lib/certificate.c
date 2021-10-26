@@ -5,6 +5,8 @@
 **/
 #include "spdm_responder_lib_internal.h"
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 /**
   Process the SPDM GET_CERTIFICATE request and return the response.
 
@@ -75,19 +77,20 @@ return_status spdm_get_response_certificate(IN void *context,
 	}
 	spdm_request_size = request_size;
 
-	if (spdm_context->local_context.local_cert_chain_provision == NULL) {
-		spdm_generate_error_response(
-			spdm_context, SPDM_ERROR_CODE_UNSUPPORTED_REQUEST,
-			SPDM_GET_CERTIFICATE, response_size, response);
-		return RETURN_SUCCESS;
-	}
-
 	slot_id = spdm_request->header.param1;
 
 	if (slot_id >= spdm_context->local_context.slot_count) {
 		spdm_generate_error_response(spdm_context,
 					     SPDM_ERROR_CODE_INVALID_REQUEST, 0,
 					     response_size, response);
+		return RETURN_SUCCESS;
+	}
+
+	if (spdm_context->local_context
+					  .local_cert_chain_provision[slot_id] == NULL) {
+		spdm_generate_error_response(
+			spdm_context, SPDM_ERROR_CODE_UNSPECIFIED,
+			0, response_size, response);
 		return RETURN_SUCCESS;
 	}
 
@@ -105,7 +108,7 @@ return_status spdm_get_response_certificate(IN void *context,
 		return RETURN_SUCCESS;
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	if ((uintn)(offset + length) >
@@ -166,3 +169,6 @@ return_status spdm_get_response_certificate(IN void *context,
 
 	return RETURN_SUCCESS;
 }
+
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP

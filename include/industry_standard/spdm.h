@@ -404,13 +404,6 @@ typedef struct {
 } spdm_challenge_request_t;
 
 ///
-/// SPDM CHALLENGE request HashType
-///
-#define SPDM_CHALLENGE_REQUEST_NO_MEASUREMENT_SUMMARY_HASH 0
-#define SPDM_CHALLENGE_REQUEST_TCB_COMPONENT_MEASUREMENT_HASH 1
-#define SPDM_CHALLENGE_REQUEST_ALL_MEASUREMENTS_HASH 0xFF
-
-///
 /// SPDM CHALLENGE response
 ///
 typedef struct {
@@ -424,6 +417,13 @@ typedef struct {
 	//uint8                opaque_data[opaque_length];
 	//uint8                signature[key_size];
 } spdm_challenge_auth_response_t;
+
+///
+/// SPDM CHALLENGE request HashType
+///
+#define SPDM_CHALLENGE_REQUEST_NO_MEASUREMENT_SUMMARY_HASH 0
+#define SPDM_CHALLENGE_REQUEST_TCB_COMPONENT_MEASUREMENT_HASH 1
+#define SPDM_CHALLENGE_REQUEST_ALL_MEASUREMENTS_HASH 0xFF
 
 typedef struct {
 	uint8 slot_id : 4;

@@ -144,6 +144,7 @@ boolean spdm_get_local_cert_chain_data(IN void *context,
 	return TRUE;
 }
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 /*
   This function calculates m1m2.
 
@@ -271,51 +272,150 @@ boolean spdm_calculate_m1m2(IN void *context, IN boolean is_mut,
 
 	return TRUE;
 }
-
+#else
 /*
-  This function calculates l1l2.
+  This function calculates m1m2 hash.
 
   @param  spdm_context                  A pointer to the SPDM context.
-  @param  l1l2_buffer_size               size in bytes of the l1l2
-  @param  l1l2_buffer                   The buffer to store the l1l2
+  @param  is_mut                        Indicate if this is from mutual authentication.
+  @param  m1m2_hash_size               size in bytes of the m1m2 hash
+  @param  m1m2_hash                   The buffer to store the m1m2 hash
 
-  @retval RETURN_SUCCESS  l1l2 is calculated.
+  @retval RETURN_SUCCESS  m1m2 is calculated.
 */
-boolean spdm_calculate_l1l2(IN void *context, IN OUT uintn *l1l2_buffer_size,
-			    OUT void *l1l2_buffer)
+boolean spdm_calculate_m1m2_hash(IN void *context, IN boolean is_mut,
+			    IN OUT uintn *m1m2_hash_size,
+			    OUT void *m1m2_hash)
 {
 	spdm_context_t *spdm_context;
 	uint32 hash_size;
-	uint8 hash_data[MAX_HASH_SIZE];
 
 	spdm_context = context;
 
 	hash_size = spdm_get_hash_size(
 		spdm_context->connection_info.algorithm.base_hash_algo);
 
+	if (is_mut) {
+		spdm_hash_final (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_mut_m1m2, m1m2_hash);
+		DEBUG((DEBUG_INFO, "m1m2 Mut hash - "));
+		internal_dump_data(m1m2_hash, hash_size);
+		DEBUG((DEBUG_INFO, "\n"));
+
+	} else {
+		spdm_hash_final (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_m1m2, m1m2_hash);
+		DEBUG((DEBUG_INFO, "m1m2 hash - "));
+		internal_dump_data(m1m2_hash, hash_size);
+		DEBUG((DEBUG_INFO, "\n"));
+	}
+
+	*m1m2_hash_size = hash_size;
+
+	return TRUE;
+}
+#endif
+
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+/*
+  This function calculates l1l2.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
+  @param  l1l2_buffer_size               size in bytes of the l1l2
+  @param  l1l2_buffer                   The buffer to store the l1l2
+
+  @retval RETURN_SUCCESS  l1l2 is calculated.
+*/
+boolean spdm_calculate_l1l2(IN void *context, IN void *session_info,
+				IN OUT uintn *l1l2_buffer_size, OUT void *l1l2_buffer)
+{
+	spdm_context_t *spdm_context;
+	return_status status;
+	spdm_session_info_t *spdm_session_info;
+	uint32 hash_size;
+	uint8 hash_data[MAX_HASH_SIZE];
+
+	spdm_context = context;
+	spdm_session_info = session_info;
+
+	hash_size = spdm_get_hash_size(
+		spdm_context->connection_info.algorithm.base_hash_algo);
+
+	if (spdm_session_info == NULL) {
+		*l1l2_buffer_size =
+			get_managed_buffer_size(&spdm_context->transcript.message_m);
+		copy_mem(l1l2_buffer,
+			get_managed_buffer(&spdm_context->transcript.message_m),
+			*l1l2_buffer_size);
+	} else {
+		DEBUG((DEBUG_INFO, "use message_m in session :\n"));
+		*l1l2_buffer_size =
+			get_managed_buffer_size(&spdm_session_info->session_transcript.message_m);
+		copy_mem(l1l2_buffer,
+			get_managed_buffer(&spdm_session_info->session_transcript.message_m),
+			*l1l2_buffer_size);
+	}
+
 	DEBUG((DEBUG_INFO, "message_m data :\n"));
-	internal_dump_hex(
-		get_managed_buffer(&spdm_context->transcript.message_m),
-		get_managed_buffer_size(&spdm_context->transcript.message_m));
+	internal_dump_hex(l1l2_buffer, *l1l2_buffer_size);
 
 	// debug only
 	spdm_hash_all(
 		spdm_context->connection_info.algorithm.base_hash_algo,
-		get_managed_buffer(&spdm_context->transcript.message_m),
-		get_managed_buffer_size(&spdm_context->transcript.message_m),
-		hash_data);
+		l1l2_buffer, *l1l2_buffer_size, hash_data);
 	DEBUG((DEBUG_INFO, "l1l2 hash - "));
 	internal_dump_data(hash_data, hash_size);
 	DEBUG((DEBUG_INFO, "\n"));
 
-	*l1l2_buffer_size =
-		get_managed_buffer_size(&spdm_context->transcript.message_m);
-	copy_mem(l1l2_buffer,
-		 get_managed_buffer(&spdm_context->transcript.message_m),
-		 *l1l2_buffer_size);
+	return TRUE;
+}
+#else
+/*
+  This function calculates l1l2 hash.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
+  @param  l1l2_hash_size               size in bytes of the l1l2 hash
+  @param  l1l2_hash                   The buffer to store the l1l2 hash
+
+  @retval RETURN_SUCCESS  l1l2 is calculated.
+*/
+boolean spdm_calculate_l1l2_hash(IN void *context, IN void *session_info,
+				IN OUT uintn *l1l2_hash_size, OUT void *l1l2_hash)
+{
+	spdm_context_t *spdm_context;
+	spdm_session_info_t *spdm_session_info;
+
+	uint32 hash_size;
+
+	spdm_context = context;
+	spdm_session_info = session_info;
+
+	hash_size = spdm_get_hash_size(
+		spdm_context->connection_info.algorithm.base_hash_algo);
+
+	if (spdm_session_info == NULL) {
+		spdm_hash_final (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_context->transcript.digest_context_l1l2, l1l2_hash);
+	} else {
+		DEBUG((DEBUG_INFO, "use message_m in session :\n"));
+		spdm_hash_final (spdm_context->connection_info.algorithm.base_hash_algo,
+			spdm_session_info->session_transcript.digest_context_l1l2, l1l2_hash);
+	}
+	DEBUG((DEBUG_INFO, "l1l2 hash - "));
+	internal_dump_data(l1l2_hash, hash_size);
+	DEBUG((DEBUG_INFO, "\n"));
+
+	*l1l2_hash_size = hash_size;
 
 	return TRUE;
 }
+#endif
 
 /**
   This function generates the certificate chain hash.
@@ -345,18 +445,20 @@ boolean spdm_generate_cert_chain_hash(IN spdm_context_t *spdm_context,
 
   @param  spdm_context                  A pointer to the SPDM context.
   @param  digest                       The digest data buffer.
-  @param  digest_size                   size in bytes of the digest data buffer.
+  @param  digest_count                   size of the digest data buffer.
 
   @retval TRUE  digest verification pass.
   @retval FALSE digest verification fail.
 **/
 boolean spdm_verify_peer_digests(IN spdm_context_t *spdm_context,
-				 IN void *digest, IN uintn digest_size)
+				 IN void *digest, IN uintn digest_count)
 {
 	uintn hash_size;
+	uint8 *hash_buffer;
 	uint8 cert_chain_buffer_hash[MAX_HASH_SIZE];
 	uint8 *cert_chain_buffer;
 	uintn cert_chain_buffer_size;
+	uintn index;
 
 	cert_chain_buffer =
 		spdm_context->local_context.peer_cert_chain_provision;
@@ -365,21 +467,28 @@ boolean spdm_verify_peer_digests(IN spdm_context_t *spdm_context,
 	if ((cert_chain_buffer != NULL) && (cert_chain_buffer_size != 0)) {
 		hash_size = spdm_get_hash_size(
 			spdm_context->connection_info.algorithm.base_hash_algo);
+		hash_buffer = digest;
+
 		spdm_hash_all(
 			spdm_context->connection_info.algorithm.base_hash_algo,
 			cert_chain_buffer, cert_chain_buffer_size,
 			cert_chain_buffer_hash);
 
-		if (const_compare_mem(digest, cert_chain_buffer_hash, hash_size) !=
-		    0) {
-			DEBUG((DEBUG_INFO,
-			       "!!! verify_peer_digests - FAIL !!!\n"));
-			return FALSE;
+		for (index = 0; index < digest_count; index++)
+		{
+			if (const_compare_mem(hash_buffer, cert_chain_buffer_hash, hash_size) == 0) {
+				DEBUG((DEBUG_INFO, "!!! verify_peer_digests - PASS !!!\n"));
+				return TRUE;
+			}
+			hash_buffer += hash_size;
 		}
+
+		DEBUG((DEBUG_INFO,
+		       "!!! verify_peer_digests - FAIL !!!\n"));
+		return FALSE;
+	} else {
+		DEBUG((DEBUG_INFO, "!!! verify_peer_digests - PASS !!!\n"));
 	}
-
-	DEBUG((DEBUG_INFO, "!!! verify_peer_digests - PASS !!!\n"));
-
 	return TRUE;
 }
 
@@ -389,19 +498,26 @@ boolean spdm_verify_peer_digests(IN spdm_context_t *spdm_context,
   @param  spdm_context                  A pointer to the SPDM context.
   @param  cert_chain_buffer              Certitiface chain buffer including spdm_cert_chain_t header.
   @param  cert_chain_buffer_size          size in bytes of the certitiface chain buffer.
+  @param  trust_anchor                  A buffer to hold the trust_anchor which is used to validate the peer certificate, if not NULL.
+  @param  trust_anchor_size             A buffer to hold the trust_anchor_size, if not NULL.
 
   @retval TRUE  Peer certificate chain buffer verification passed.
   @retval FALSE Peer certificate chain buffer verification failed.
 **/
 boolean spdm_verify_peer_cert_chain_buffer(IN spdm_context_t *spdm_context,
 					   IN void *cert_chain_buffer,
-					   IN uintn cert_chain_buffer_size)
+					   IN uintn cert_chain_buffer_size,
+					   OUT void **trust_anchor OPTIONAL,
+					   OUT uintn *trust_anchor_size OPTIONAL)
 {
 	uint8 *cert_chain_data;
 	uintn cert_chain_data_size;
-	uintn hash_size;
-	uint8 *root_cert_hash;
+	uint8 *root_cert;
+	uintn root_cert_size;
+	uint8 root_cert_hash[MAX_HASH_SIZE];
 	uintn root_cert_hash_size;
+	uint8 *received_root_cert;
+	uintn received_root_cert_size;
 	boolean result;
 
 	result = spdm_verify_certificate_chain_buffer(
@@ -411,30 +527,54 @@ boolean spdm_verify_peer_cert_chain_buffer(IN spdm_context_t *spdm_context,
 		return FALSE;
 	}
 
-	root_cert_hash =
-		spdm_context->local_context.peer_root_cert_hash_provision;
-	root_cert_hash_size =
-		spdm_context->local_context.peer_root_cert_hash_provision_size;
+	root_cert = spdm_context->local_context.peer_root_cert_provision;
+	root_cert_size =
+		spdm_context->local_context.peer_root_cert_provision_size;
 	cert_chain_data = spdm_context->local_context.peer_cert_chain_provision;
 	cert_chain_data_size =
 		spdm_context->local_context.peer_cert_chain_provision_size;
 
-	if ((root_cert_hash != NULL) && (root_cert_hash_size != 0)) {
-		hash_size = spdm_get_hash_size(
+	if ((root_cert != NULL) && (root_cert_size != 0)) {
+		root_cert_hash_size = spdm_get_hash_size(
 			spdm_context->connection_info.algorithm.base_hash_algo);
-		if (root_cert_hash_size != hash_size) {
-			DEBUG((DEBUG_INFO,
-			       "!!! verify_peer_cert_chain_buffer - FAIL (hash size mismatch) !!!\n"));
-			return FALSE;
-		}
+		spdm_hash_all(
+			spdm_context->connection_info.algorithm.base_hash_algo,
+			root_cert, root_cert_size, root_cert_hash);
 		if (const_compare_mem((uint8 *)cert_chain_buffer +
 					sizeof(spdm_cert_chain_t),
-				root_cert_hash, hash_size) != 0) {
+				root_cert_hash, root_cert_hash_size) != 0) {
 			DEBUG((DEBUG_INFO,
 			       "!!! verify_peer_cert_chain_buffer - FAIL (root hash mismatch) !!!\n"));
 			return FALSE;
 		}
+
+		x509_get_cert_from_cert_chain(
+		    (uint8 *)cert_chain_buffer + sizeof(spdm_cert_chain_t) + root_cert_hash_size,
+			cert_chain_buffer_size - sizeof(spdm_cert_chain_t) - root_cert_hash_size,
+			0, &received_root_cert, &received_root_cert_size);
+		if (spdm_is_root_certificate(received_root_cert, received_root_cert_size)) {
+			if (const_compare_mem(received_root_cert, root_cert, root_cert_size) != 0) {
+				DEBUG((DEBUG_INFO,
+					"!!! verify_peer_cert_chain_buffer - FAIL (root cert mismatch) !!!\n"));
+				return FALSE;
+			}
+		} else {
+			if (!x509_verify_cert(received_root_cert, received_root_cert_size,
+					root_cert, root_cert_size)) {
+				DEBUG((DEBUG_INFO,
+					"!!! verify_peer_cert_chain_buffer - FAIL (received root cert verify failed)!!!\n"));
+				return FALSE;
+			}
+		}
+		if (trust_anchor != NULL) {
+			*trust_anchor = root_cert;
+		}
+		if (trust_anchor_size != NULL) {
+			*trust_anchor_size = root_cert_size;
+		}
 	} else if ((cert_chain_data != NULL) && (cert_chain_data_size != 0)) {
+		// Whether it contains the root certificate or not,
+		// it should be equal to the one provisioned in trusted environment
 		if (cert_chain_data_size != cert_chain_buffer_size) {
 			DEBUG((DEBUG_INFO,
 			       "!!! verify_peer_cert_chain_buffer - FAIL !!!\n"));
@@ -445,6 +585,13 @@ boolean spdm_verify_peer_cert_chain_buffer(IN spdm_context_t *spdm_context,
 			DEBUG((DEBUG_INFO,
 			       "!!! verify_peer_cert_chain_buffer - FAIL !!!\n"));
 			return FALSE;
+		}
+		if (trust_anchor != NULL) {
+			*trust_anchor = cert_chain_data + sizeof(spdm_cert_chain_t) +
+				spdm_get_hash_size(spdm_context->connection_info.algorithm.base_hash_algo);
+		}
+		if (trust_anchor_size != NULL) {
+			*trust_anchor_size = cert_chain_data_size;
 		}
 	}
 
@@ -469,12 +616,23 @@ boolean spdm_generate_challenge_auth_signature(IN spdm_context_t *spdm_context,
 {
 	boolean result;
 	uintn signature_size;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	uint8 m1m2_buffer[MAX_SPDM_MESSAGE_BUFFER_SIZE];
 	uintn m1m2_buffer_size;
+#else
+	uint8 m1m2_hash[MAX_HASH_SIZE];
+	uintn m1m2_hash_size;
+#endif
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	m1m2_buffer_size = sizeof(m1m2_buffer);
 	result = spdm_calculate_m1m2(spdm_context, is_requester,
 				     &m1m2_buffer_size, &m1m2_buffer);
+#else
+	m1m2_hash_size = sizeof(m1m2_hash);
+	result = spdm_calculate_m1m2_hash(spdm_context, is_requester,
+				     &m1m2_hash_size, &m1m2_hash);
+#endif
 	if (!result) {
 		return FALSE;
 	}
@@ -483,20 +641,41 @@ boolean spdm_generate_challenge_auth_signature(IN spdm_context_t *spdm_context,
 		signature_size = spdm_get_req_asym_signature_size(
 			spdm_context->connection_info.algorithm
 				.req_base_asym_alg);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 		result = spdm_requester_data_sign(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
 			spdm_context->connection_info.algorithm
 				.req_base_asym_alg,
 			spdm_context->connection_info.algorithm.base_hash_algo,
-			m1m2_buffer, m1m2_buffer_size, signature,
+			FALSE, m1m2_buffer, m1m2_buffer_size, signature,
 			&signature_size);
+#else
+		result = spdm_requester_data_sign(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
+			spdm_context->connection_info.algorithm
+				.req_base_asym_alg,
+			spdm_context->connection_info.algorithm.base_hash_algo,
+			TRUE, m1m2_hash, m1m2_hash_size, signature,
+			&signature_size);
+#endif
 	} else {
 		signature_size = spdm_get_asym_signature_size(
 			spdm_context->connection_info.algorithm.base_asym_algo);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 		result = spdm_responder_data_sign(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
 			spdm_context->connection_info.algorithm.base_asym_algo,
 			spdm_context->connection_info.algorithm.base_hash_algo,
-			m1m2_buffer, m1m2_buffer_size, signature,
+			FALSE, m1m2_buffer, m1m2_buffer_size, signature,
 			&signature_size);
+#else
+		result = spdm_responder_data_sign(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
+			spdm_context->connection_info.algorithm.base_asym_algo,
+			spdm_context->connection_info.algorithm.base_hash_algo,
+			TRUE, m1m2_hash, m1m2_hash_size, signature,
+			&signature_size);
+#endif
 	}
 
 	return result;
@@ -573,12 +752,23 @@ boolean spdm_verify_challenge_auth_signature(IN spdm_context_t *spdm_context,
 	void *context;
 	uint8 *cert_chain_data;
 	uintn cert_chain_data_size;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	uint8 m1m2_buffer[MAX_SPDM_MESSAGE_BUFFER_SIZE];
 	uintn m1m2_buffer_size;
+#else
+	uint8 m1m2_hash[MAX_HASH_SIZE];
+	uintn m1m2_hash_size;
+#endif
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	m1m2_buffer_size = sizeof(m1m2_buffer);
 	result = spdm_calculate_m1m2(spdm_context, !is_requester,
 				     &m1m2_buffer_size, &m1m2_buffer);
+#else
+	m1m2_hash_size = sizeof(m1m2_hash);
+	result = spdm_calculate_m1m2_hash(spdm_context, !is_requester,
+				     &m1m2_hash_size, &m1m2_hash);
+#endif
 	if (!result) {
 		return FALSE;
 	}
@@ -607,11 +797,21 @@ boolean spdm_verify_challenge_auth_signature(IN spdm_context_t *spdm_context,
 			return FALSE;
 		}
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 		result = spdm_asym_verify(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
 			spdm_context->connection_info.algorithm.base_asym_algo,
 			spdm_context->connection_info.algorithm.base_hash_algo,
 			context, m1m2_buffer, m1m2_buffer_size, sign_data,
 			sign_data_size);
+#else
+		result = spdm_asym_verify_hash(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
+			spdm_context->connection_info.algorithm.base_asym_algo,
+			spdm_context->connection_info.algorithm.base_hash_algo,
+			context, m1m2_hash, m1m2_hash_size, sign_data,
+			sign_data_size);
+#endif
 		spdm_asym_free(
 			spdm_context->connection_info.algorithm.base_asym_algo,
 			context);
@@ -624,12 +824,23 @@ boolean spdm_verify_challenge_auth_signature(IN spdm_context_t *spdm_context,
 			return FALSE;
 		}
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 		result = spdm_req_asym_verify(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
 			spdm_context->connection_info.algorithm
 				.req_base_asym_alg,
 			spdm_context->connection_info.algorithm.base_hash_algo,
 			context, m1m2_buffer, m1m2_buffer_size, sign_data,
 			sign_data_size);
+#else
+		result = spdm_req_asym_verify_hash(
+			spdm_context->connection_info.version, SPDM_CHALLENGE_AUTH,
+			spdm_context->connection_info.algorithm
+				.req_base_asym_alg,
+			spdm_context->connection_info.algorithm.base_hash_algo,
+			context, m1m2_hash, m1m2_hash_size, sign_data,
+			sign_data_size);
+#endif
 		spdm_req_asym_free(spdm_context->connection_info.algorithm
 					   .req_base_asym_alg,
 				   context);
@@ -723,6 +934,7 @@ spdm_generate_measurement_summary_hash(IN spdm_context_t *spdm_context,
 		// get all measurement data
 		device_measurement_size = sizeof(device_measurement);
 		ret = spdm_measurement_collection(
+			spdm_context->connection_info.version,
 			spdm_context->connection_info.algorithm.measurement_spec,
 			spdm_context->connection_info.algorithm
 				.measurement_hash_algo,
@@ -815,41 +1027,68 @@ spdm_generate_measurement_summary_hash(IN spdm_context_t *spdm_context,
 
 /**
   This function generates the measurement signature to response message based upon l1l2.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  signature                    The buffer to store the signature.
 
   @retval TRUE  measurement signature is generated.
   @retval FALSE measurement signature is not generated.
 **/
 boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
+						IN spdm_session_info_t *session_info,
 					    OUT uint8 *signature)
 {
 	uintn signature_size;
 	boolean result;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	uint8 l1l2_buffer[MAX_SPDM_MESSAGE_BUFFER_SIZE];
 	uintn l1l2_buffer_size;
+#else
+	uint8 l1l2_hash[MAX_HASH_SIZE];
+	uintn l1l2_hash_size;
+#endif
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	l1l2_buffer_size = sizeof(l1l2_buffer);
-	result = spdm_calculate_l1l2(spdm_context, &l1l2_buffer_size,
+	result = spdm_calculate_l1l2(spdm_context, session_info, &l1l2_buffer_size,
 				     l1l2_buffer);
+#else
+	l1l2_hash_size = sizeof(l1l2_hash);
+	result = spdm_calculate_l1l2_hash(spdm_context, session_info, &l1l2_hash_size,
+				     l1l2_hash);
+#endif
 	if (!result) {
 		return FALSE;
 	}
 
 	signature_size = spdm_get_asym_signature_size(
 		spdm_context->connection_info.algorithm.base_asym_algo);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	result = spdm_responder_data_sign(
+		spdm_context->connection_info.version, SPDM_MEASUREMENTS,
 		spdm_context->connection_info.algorithm.base_asym_algo,
 		spdm_context->connection_info.algorithm.base_hash_algo,
-		l1l2_buffer, l1l2_buffer_size, signature, &signature_size);
+		FALSE, l1l2_buffer, l1l2_buffer_size, signature, &signature_size);
+#else
+	result = spdm_responder_data_sign(
+		spdm_context->connection_info.version, SPDM_MEASUREMENTS,
+		spdm_context->connection_info.algorithm.base_asym_algo,
+		spdm_context->connection_info.algorithm.base_hash_algo,
+		TRUE, l1l2_hash, l1l2_hash_size, signature, &signature_size);
+#endif
 	return result;
 }
 
 /**
   This function verifies the measurement signature based upon l1l2.
+  If session_info is NULL, this function will use M cache of SPDM context,
+  else will use M cache of SPDM session context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info                  A pointer to the SPDM session context.
   @param  sign_data                     The signature data buffer.
   @param  sign_data_size                 size in bytes of the signature data buffer.
 
@@ -857,6 +1096,7 @@ boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
   @retval FALSE signature verification fail.
 **/
 boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
+					  IN spdm_session_info_t *session_info,
 					  IN void *sign_data,
 					  IN uintn sign_data_size)
 {
@@ -866,12 +1106,23 @@ boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
 	void *context;
 	uint8 *cert_chain_data;
 	uintn cert_chain_data_size;
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	uint8 l1l2_buffer[MAX_SPDM_MESSAGE_BUFFER_SIZE];
 	uintn l1l2_buffer_size;
+#else
+	uint8 l1l2_hash[MAX_HASH_SIZE];
+	uintn l1l2_hash_size;
+#endif
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	l1l2_buffer_size = sizeof(l1l2_buffer);
-	result = spdm_calculate_l1l2(spdm_context, &l1l2_buffer_size,
+	result = spdm_calculate_l1l2(spdm_context, session_info, &l1l2_buffer_size,
 				     l1l2_buffer);
+#else
+	l1l2_hash_size = sizeof(l1l2_hash);
+	result = spdm_calculate_l1l2_hash(spdm_context, session_info, &l1l2_hash_size,
+				     l1l2_hash);
+#endif
 	if (!result) {
 		return FALSE;
 	}
@@ -899,10 +1150,19 @@ boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
 		return FALSE;
 	}
 
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	result = spdm_asym_verify(
+		spdm_context->connection_info.version, SPDM_MEASUREMENTS,
 		spdm_context->connection_info.algorithm.base_asym_algo,
 		spdm_context->connection_info.algorithm.base_hash_algo, context,
 		l1l2_buffer, l1l2_buffer_size, sign_data, sign_data_size);
+#else
+	result = spdm_asym_verify_hash(
+		spdm_context->connection_info.version, SPDM_MEASUREMENTS,
+		spdm_context->connection_info.algorithm.base_asym_algo,
+		spdm_context->connection_info.algorithm.base_hash_algo, context,
+		l1l2_hash, l1l2_hash_size, sign_data, sign_data_size);
+#endif
 	spdm_asym_free(spdm_context->connection_info.algorithm.base_asym_algo,
 		       context);
 	if (!result) {

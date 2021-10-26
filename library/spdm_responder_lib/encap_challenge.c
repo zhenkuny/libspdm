@@ -6,6 +6,8 @@
 
 #include "spdm_responder_lib_internal.h"
 
+#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
 /**
   Get the SPDM encapsulated CHALLENGE request.
 
@@ -53,7 +55,7 @@ return_status spdm_get_encap_request_challenge(IN spdm_context_t *spdm_context,
 	internal_dump_data(spdm_request->nonce, SPDM_NONCE_SIZE);
 	DEBUG((DEBUG_INFO, "\n"));
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	//
@@ -116,8 +118,7 @@ return_status spdm_process_encap_response_challenge_auth(
 	}
 	if (spdm_response->header.request_response_code == SPDM_ERROR) {
 		status = spdm_handle_encap_error_response_main(
-			spdm_context, &spdm_context->transcript.message_mut_c,
-			spdm_context->encap_context.last_encap_request_size,
+			spdm_context,
 			spdm_response->header.param1);
 		if (RETURN_ERROR(status)) {
 			return status;
@@ -236,3 +237,5 @@ return_status spdm_process_encap_response_challenge_auth(
 
 	return RETURN_SUCCESS;
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP

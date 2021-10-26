@@ -52,6 +52,8 @@ void spdm_session_info_init(IN spdm_context_t *spdm_context,
 		session_info->secured_message_context, session_type);
 	spdm_secured_message_set_algorithms(
 		session_info->secured_message_context,
+		spdm_context->connection_info.version,
+		spdm_context->connection_info.secured_message_version,
 		spdm_context->connection_info.algorithm.base_hash_algo,
 		spdm_context->connection_info.algorithm.dhe_named_group,
 		spdm_context->connection_info.algorithm.aead_cipher_suite,
@@ -60,10 +62,17 @@ void spdm_session_info_init(IN spdm_context_t *spdm_context,
 		session_info->secured_message_context,
 		spdm_context->local_context.psk_hint,
 		spdm_context->local_context.psk_hint_size);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
 	session_info->session_transcript.message_k.max_buffer_size =
-		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+		sizeof(session_info->session_transcript.message_k.buffer);
 	session_info->session_transcript.message_f.max_buffer_size =
-		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+		sizeof(session_info->session_transcript.message_f.buffer);
+	session_info->session_transcript.message_m.max_buffer_size =
+		sizeof(session_info->session_transcript.message_m.buffer);
+#else
+	session_info->session_transcript.temp_message_k.max_buffer_size =
+		sizeof(session_info->session_transcript.temp_message_k.buffer);
+#endif
 }
 
 /**

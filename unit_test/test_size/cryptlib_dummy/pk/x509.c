@@ -238,6 +238,52 @@ boolean ec_get_public_key_from_x509(IN const uint8 *cert, IN uintn cert_size,
 }
 
 /**
+  Retrieve the Ed public key from one DER-encoded X509 certificate.
+
+  @param[in]  cert         Pointer to the DER-encoded X509 certificate.
+  @param[in]  cert_size     size of the X509 certificate in bytes.
+  @param[out] ecd_context    Pointer to new-generated Ed DSA context which contain the retrieved
+                           Ed public key component. Use ecd_free() function to free the
+                           resource.
+
+  If cert is NULL, then return FALSE.
+  If ecd_context is NULL, then return FALSE.
+
+  @retval  TRUE   Ed public key was retrieved successfully.
+  @retval  FALSE  Fail to retrieve Ed public key from X509 certificate.
+
+**/
+boolean ecd_get_public_key_from_x509(IN const uint8 *cert, IN uintn cert_size,
+				    OUT void **ecd_context)
+{
+	ASSERT(FALSE);
+	return FALSE;
+}
+
+/**
+  Retrieve the sm2 public key from one DER-encoded X509 certificate.
+
+  @param[in]  cert         Pointer to the DER-encoded X509 certificate.
+  @param[in]  cert_size     size of the X509 certificate in bytes.
+  @param[out] sm2_context   Pointer to new-generated sm2 context which contain the retrieved
+                           sm2 public key component. Use sm2_free() function to free the
+                           resource.
+
+  If cert is NULL, then return FALSE.
+  If ecd_context is NULL, then return FALSE.
+
+  @retval  TRUE   sm2 public key was retrieved successfully.
+  @retval  FALSE  Fail to retrieve sm2 public key from X509 certificate.
+
+**/
+boolean sm2_get_public_key_from_x509(IN const uint8 *cert, IN uintn cert_size,
+				     OUT void **sm2_context)
+{
+	ASSERT(FALSE);
+	return FALSE;
+}
+
+/**
   Verify one X509 certificate was issued by the trusted CA.
 
   @param[in]      cert         Pointer to the DER-encoded X509 certificate to be verified.
@@ -393,24 +439,24 @@ return_status x509_get_serial_number(IN const uint8 *cert, IN uintn cert_size,
   Retrieve the issuer bytes from one X.509 certificate.
 
   If cert is NULL, then return FALSE.
-  If CertIssuerSize is NULL, then return FALSE.
+  If issuer_size is NULL, then return FALSE.
   If this interface is not supported, then return FALSE.
 
   @param[in]      cert         Pointer to the DER-encoded X509 certificate.
   @param[in]      cert_size     size of the X509 certificate in bytes.
-  @param[out]     CertIssuer  Pointer to the retrieved certificate subject bytes.
-  @param[in, out] CertIssuerSize  The size in bytes of the CertIssuer buffer on input,
-                               and the size of buffer returned cert_subject on output.
+  @param[out]     cert_issuer  Pointer to the retrieved certificate subject bytes.
+  @param[in, out] issuer_size  The size in bytes of the cert_issuer buffer on input,
+                               and the size of buffer returned cert_issuer on output.
 
   @retval  TRUE   The certificate issuer retrieved successfully.
-  @retval  FALSE  Invalid certificate, or the CertIssuerSize is too small for the result.
-                  The CertIssuerSize will be updated with the required size.
+  @retval  FALSE  Invalid certificate, or the issuer_size is too small for the result.
+                  The issuer_size will be updated with the required size.
   @retval  FALSE  This interface is not supported.
 
 **/
 boolean x509_get_issuer_name(IN const uint8 *cert, IN uintn cert_size,
-			     OUT uint8 *CertIssuer,
-			     IN OUT uintn *CertIssuerSize)
+			     OUT uint8 *cert_issuer,
+			     IN OUT uintn *issuer_size)
 {
 	ASSERT(FALSE);
 	return FALSE;

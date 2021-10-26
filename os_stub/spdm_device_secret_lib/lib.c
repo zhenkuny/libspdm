@@ -38,11 +38,18 @@ boolean read_responder_private_certificate(IN uint32 base_asym_algo,
 	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_3072:
 		file = "rsa3072/end_responder.key";
 		break;
+	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_4096:
+	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_4096:
+		file = "rsa4096/end_responder.key";
+		break;
 	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P256:
 		file = "ecp256/end_responder.key";
 		break;
 	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384:
 		file = "ecp384/end_responder.key";
+		break;
+	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P521:
+		file = "ecp521/end_responder.key";
 		break;
 	default:
 		ASSERT(FALSE);
@@ -67,11 +74,18 @@ boolean read_requester_private_certificate(IN uint16 req_base_asym_alg,
 	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_3072:
 		file = "rsa3072/end_requester.key";
 		break;
+	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSASSA_4096:
+	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_RSAPSS_4096:
+		file = "rsa4096/end_requester.key";
+		break;
 	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P256:
 		file = "ecp256/end_requester.key";
 		break;
 	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P384:
 		file = "ecp384/end_requester.key";
+		break;
+	case SPDM_ALGORITHMS_BASE_ASYM_ALGO_TPM_ALG_ECDSA_ECC_NIST_P521:
+		file = "ecp521/end_requester.key";
 		break;
 	default:
 		ASSERT(FALSE);
@@ -96,7 +110,9 @@ boolean read_requester_private_certificate(IN uint16 req_base_asym_alg,
   @retval TRUE  the device measurement collection success and measurement is returned.
   @retval FALSE the device measurement collection fail.
 **/
-boolean spdm_measurement_collection(IN uint8 measurement_specification,
+boolean spdm_measurement_collection(
+				    IN spdm_version_number_t spdm_version,
+					IN uint8 measurement_specification,
 				    IN uint32 measurement_hash_algo,
 				    OUT uint8 *device_measurement_count,
 				    OUT void *device_measurement,
@@ -198,8 +214,10 @@ boolean spdm_measurement_collection(IN uint8 measurement_specification,
   @retval TRUE  signing success.
   @retval FALSE signing fail.
 **/
-boolean spdm_requester_data_sign(IN uint16 req_base_asym_alg,
-				 IN uint32 base_hash_algo,
+boolean spdm_requester_data_sign(
+				 IN spdm_version_number_t spdm_version, IN uint8 op_code,
+				 IN uint16 req_base_asym_alg,
+				 IN uint32 base_hash_algo, IN boolean is_data_hash,
 				 IN const uint8 *message, IN uintn message_size,
 				 OUT uint8 *signature, IN OUT uintn *sig_size)
 {
@@ -221,8 +239,13 @@ boolean spdm_requester_data_sign(IN uint16 req_base_asym_alg,
 	if (!result) {
 		return FALSE;
 	}
-	result = spdm_req_asym_sign(req_base_asym_alg, base_hash_algo, context,
-				    message, message_size, signature, sig_size);
+	if (is_data_hash) {
+		result = spdm_req_asym_sign_hash(spdm_version, op_code, req_base_asym_alg, base_hash_algo, context,
+						message, message_size, signature, sig_size);
+	} else {
+		result = spdm_req_asym_sign(spdm_version, op_code, req_base_asym_alg, base_hash_algo, context,
+						message, message_size, signature, sig_size);
+	}
 	spdm_req_asym_free(req_base_asym_alg, context);
 	free(private_pem);
 
@@ -243,8 +266,10 @@ boolean spdm_requester_data_sign(IN uint16 req_base_asym_alg,
   @retval TRUE  signing success.
   @retval FALSE signing fail.
 **/
-boolean spdm_responder_data_sign(IN uint32 base_asym_algo,
-				 IN uint32 base_hash_algo,
+boolean spdm_responder_data_sign(
+				 IN spdm_version_number_t spdm_version, IN uint8 op_code,
+				 IN uint32 base_asym_algo,
+				 IN uint32 base_hash_algo, IN boolean is_data_hash,
 				 IN const uint8 *message, IN uintn message_size,
 				 OUT uint8 *signature, IN OUT uintn *sig_size)
 {
@@ -264,8 +289,13 @@ boolean spdm_responder_data_sign(IN uint32 base_asym_algo,
 	if (!result) {
 		return FALSE;
 	}
-	result = spdm_asym_sign(base_asym_algo, base_hash_algo, context,
-				message, message_size, signature, sig_size);
+	if (is_data_hash) {
+		result = spdm_asym_sign_hash(spdm_version, op_code, base_asym_algo, base_hash_algo, context,
+					message, message_size, signature, sig_size);
+	} else {
+		result = spdm_asym_sign(spdm_version, op_code, base_asym_algo, base_hash_algo, context,
+					message, message_size, signature, sig_size);
+	}
 	spdm_asym_free(base_asym_algo, context);
 	free(private_pem);
 
@@ -293,7 +323,9 @@ uint8 m_bin_str0[0x11] = {
   @retval TRUE   Hkdf generated successfully.
   @retval FALSE  Hkdf generation failed.
 **/
-boolean spdm_psk_handshake_secret_hkdf_expand(IN uint32 base_hash_algo,
+boolean spdm_psk_handshake_secret_hkdf_expand(
+					      IN spdm_version_number_t spdm_version,
+					      IN uint32 base_hash_algo,
 					      IN const uint8 *psk_hint,
 					      OPTIONAL IN uintn psk_hint_size,
 					      OPTIONAL IN const uint8 *info,
@@ -351,7 +383,9 @@ boolean spdm_psk_handshake_secret_hkdf_expand(IN uint32 base_hash_algo,
   @retval TRUE   Hkdf generated successfully.
   @retval FALSE  Hkdf generation failed.
 **/
-boolean spdm_psk_master_secret_hkdf_expand(IN uint32 base_hash_algo,
+boolean spdm_psk_master_secret_hkdf_expand(
+					   IN spdm_version_number_t spdm_version,
+					   IN uint32 base_hash_algo,
 					   IN const uint8 *psk_hint,
 					   OPTIONAL IN uintn psk_hint_size,
 					   OPTIONAL IN const uint8 *info,

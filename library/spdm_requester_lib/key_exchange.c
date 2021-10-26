@@ -44,6 +44,9 @@ typedef struct {
   @param  session_id                    session_id from the KEY_EXCHANGE_RSP response.
   @param  req_slot_id_param               req_slot_id_param from the KEY_EXCHANGE_RSP response.
   @param  measurement_hash              measurement_hash from the KEY_EXCHANGE_RSP response.
+  @param  requester_random_in           A buffer to hold the requester random (32 bytes) as input, if not NULL.
+  @param  requester_random              A buffer to hold the requester random (32 bytes), if not NULL.
+  @param  responder_random              A buffer to hold the responder random (32 bytes), if not NULL.
 
   @retval RETURN_SUCCESS               The KEY_EXCHANGE is sent and the KEY_EXCHANGE_RSP is received.
   @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
@@ -51,7 +54,10 @@ typedef struct {
 return_status try_spdm_send_receive_key_exchange(
 	IN spdm_context_t *spdm_context, IN uint8 measurement_hash_type,
 	IN uint8 slot_id, OUT uint32 *session_id, OUT uint8 *heartbeat_period,
-	OUT uint8 *req_slot_id_param, OUT void *measurement_hash)
+	OUT uint8 *req_slot_id_param, OUT void *measurement_hash,
+	IN void *requester_random_in OPTIONAL,
+	OUT void *requester_random OPTIONAL,
+	OUT void *responder_random OPTIONAL)
 {
 	boolean result;
 	return_status status;
@@ -81,7 +87,7 @@ return_status try_spdm_send_receive_key_exchange(
 		    SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP)) {
 		return RETURN_UNSUPPORTED;
 	}
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 									SPDM_KEY_EXCHANGE);
 	if (spdm_context->connection_info.connection_state <
 	    SPDM_CONNECTION_STATE_NEGOTIATED) {
@@ -102,11 +108,18 @@ return_status try_spdm_send_receive_key_exchange(
 	spdm_request.header.request_response_code = SPDM_KEY_EXCHANGE;
 	spdm_request.header.param1 = measurement_hash_type;
 	spdm_request.header.param2 = slot_id;
-	spdm_get_random_number(SPDM_RANDOM_DATA_SIZE, spdm_request.random_data);
+	if (requester_random_in == NULL) {
+		spdm_get_random_number(SPDM_RANDOM_DATA_SIZE, spdm_request.random_data);
+	} else {
+		copy_mem (spdm_request.random_data, requester_random_in, SPDM_RANDOM_DATA_SIZE);
+	}
 	DEBUG((DEBUG_INFO, "ClientRandomData (0x%x) - ",
 	       SPDM_RANDOM_DATA_SIZE));
 	internal_dump_data(spdm_request.random_data, SPDM_RANDOM_DATA_SIZE);
 	DEBUG((DEBUG_INFO, "\n"));
+	if (requester_random != NULL) {
+		copy_mem (requester_random, spdm_request.random_data, SPDM_RANDOM_DATA_SIZE);
+	}
 
 	req_session_id = spdm_allocate_req_session_id(spdm_context);
 	spdm_request.req_session_id = req_session_id;
@@ -161,7 +174,7 @@ return_status try_spdm_send_receive_key_exchange(
 	}
 	if (spdm_response.header.request_response_code == SPDM_ERROR) {
 		status = spdm_handle_error_response_main(
-			spdm_context, NULL, NULL, 0, &spdm_response_size,
+			spdm_context, NULL, &spdm_response_size,
 			&spdm_response, SPDM_KEY_EXCHANGE,
 			SPDM_KEY_EXCHANGE_RSP,
 			sizeof(spdm_key_exchange_response_max_t));
@@ -192,11 +205,32 @@ return_status try_spdm_send_receive_key_exchange(
 		return RETURN_DEVICE_ERROR;
 	}
 
+	if (!spdm_is_capabilities_flag_supported(
+		    spdm_context, TRUE,
+		    SPDM_GET_CAPABILITIES_REQUEST_FLAGS_HBEAT_CAP,
+		    SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_HBEAT_CAP)) {
+		if (spdm_response.header.param1 != 0) {
+			spdm_secured_message_dhe_free(
+				spdm_context->connection_info.algorithm
+					.dhe_named_group,
+				dhe_context);
+			return RETURN_DEVICE_ERROR;
+		}
+	}
 	if (heartbeat_period != NULL) {
 		*heartbeat_period = spdm_response.header.param1;
 	}
 	*req_slot_id_param = spdm_response.req_slot_id_param;
 	if (spdm_response.mut_auth_requested != 0) {
+		if ((spdm_response.mut_auth_requested != SPDM_KEY_EXCHANGE_RESPONSE_MUT_AUTH_REQUESTED) &&
+		    (spdm_response.mut_auth_requested != SPDM_KEY_EXCHANGE_RESPONSE_MUT_AUTH_REQUESTED_WITH_ENCAP_REQUEST) &&
+		    (spdm_response.mut_auth_requested != SPDM_KEY_EXCHANGE_RESPONSE_MUT_AUTH_REQUESTED_WITH_GET_DIGESTS)) {
+			spdm_secured_message_dhe_free(
+				spdm_context->connection_info.algorithm
+					.dhe_named_group,
+				dhe_context);
+			return RETURN_DEVICE_ERROR;
+		}
 		if ((*req_slot_id_param != 0xF) &&
 		    (*req_slot_id_param >=
 		     spdm_context->local_context.slot_count)) {
@@ -254,6 +288,9 @@ return_status try_spdm_send_receive_key_exchange(
 	       SPDM_RANDOM_DATA_SIZE));
 	internal_dump_data(spdm_response.random_data, SPDM_RANDOM_DATA_SIZE);
 	DEBUG((DEBUG_INFO, "\n"));
+	if (responder_random != NULL) {
+		copy_mem (responder_random, spdm_response.random_data, SPDM_RANDOM_DATA_SIZE);
+	}
 
 	DEBUG((DEBUG_INFO, "ServerKey (0x%x):\n", dhe_key_size));
 	internal_dump_hex(spdm_response.exchange_data, dhe_key_size);
@@ -305,7 +342,7 @@ return_status try_spdm_send_receive_key_exchange(
 	//
 	// Cache session data
 	//
-	status = spdm_append_message_k(session_info, &spdm_request,
+	status = spdm_append_message_k(spdm_context, session_info, TRUE, &spdm_request,
 				       spdm_request_size);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, *session_id);
@@ -315,7 +352,7 @@ return_status try_spdm_send_receive_key_exchange(
 		return RETURN_SECURITY_VIOLATION;
 	}
 
-	status = spdm_append_message_k(session_info, &spdm_response,
+	status = spdm_append_message_k(spdm_context, session_info, TRUE, &spdm_response,
 				       spdm_response_size - signature_size -
 					       hmac_size);
 	if (RETURN_ERROR(status)) {
@@ -342,7 +379,7 @@ return_status try_spdm_send_receive_key_exchange(
 		return RETURN_SECURITY_VIOLATION;
 	}
 
-	status = spdm_append_message_k(session_info, signature, signature_size);
+	status = spdm_append_message_k(spdm_context, session_info, TRUE, signature, signature_size);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, *session_id);
 		spdm_secured_message_dhe_free(
@@ -398,7 +435,7 @@ return_status try_spdm_send_receive_key_exchange(
 		}
 		ptr += hmac_size;
 
-		status = spdm_append_message_k(session_info, verify_data,
+		status = spdm_append_message_k(spdm_context, session_info, TRUE, verify_data,
 					       hmac_size);
 		if (RETURN_ERROR(status)) {
 			spdm_free_session_id(spdm_context, *session_id);
@@ -420,6 +457,20 @@ return_status try_spdm_send_receive_key_exchange(
 	return RETURN_SUCCESS;
 }
 
+/**
+  This function sends KEY_EXCHANGE and receives KEY_EXCHANGE_RSP for SPDM key exchange.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  measurement_hash_type          measurement_hash_type to the KEY_EXCHANGE request.
+  @param  slot_id                      slot_id to the KEY_EXCHANGE request.
+  @param  heartbeat_period              heartbeat_period from the KEY_EXCHANGE_RSP response.
+  @param  session_id                    session_id from the KEY_EXCHANGE_RSP response.
+  @param  req_slot_id_param               req_slot_id_param from the KEY_EXCHANGE_RSP response.
+  @param  measurement_hash              measurement_hash from the KEY_EXCHANGE_RSP response.
+
+  @retval RETURN_SUCCESS               The KEY_EXCHANGE is sent and the KEY_EXCHANGE_RSP is received.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+**/
 return_status spdm_send_receive_key_exchange(
 	IN spdm_context_t *spdm_context, IN uint8 measurement_hash_type,
 	IN uint8 slot_id, OUT uint32 *session_id, OUT uint8 *heartbeat_period,
@@ -433,7 +484,50 @@ return_status spdm_send_receive_key_exchange(
 		status = try_spdm_send_receive_key_exchange(
 			spdm_context, measurement_hash_type, slot_id,
 			session_id, heartbeat_period, req_slot_id_param,
-			measurement_hash);
+			measurement_hash, NULL, NULL, NULL);
+		if (RETURN_NO_RESPONSE != status) {
+			return status;
+		}
+	} while (retry-- != 0);
+
+	return status;
+}
+
+/**
+  This function sends KEY_EXCHANGE and receives KEY_EXCHANGE_RSP for SPDM key exchange.
+
+  @param  spdm_context                  A pointer to the SPDM context.
+  @param  measurement_hash_type          measurement_hash_type to the KEY_EXCHANGE request.
+  @param  slot_id                      slot_id to the KEY_EXCHANGE request.
+  @param  heartbeat_period              heartbeat_period from the KEY_EXCHANGE_RSP response.
+  @param  session_id                    session_id from the KEY_EXCHANGE_RSP response.
+  @param  req_slot_id_param               req_slot_id_param from the KEY_EXCHANGE_RSP response.
+  @param  measurement_hash              measurement_hash from the KEY_EXCHANGE_RSP response.
+  @param  requester_random_in           A buffer to hold the requester random (32 bytes) as input, if not NULL.
+  @param  requester_random              A buffer to hold the requester random (32 bytes), if not NULL.
+  @param  responder_random              A buffer to hold the responder random (32 bytes), if not NULL.
+
+  @retval RETURN_SUCCESS               The KEY_EXCHANGE is sent and the KEY_EXCHANGE_RSP is received.
+  @retval RETURN_DEVICE_ERROR          A device error occurs when communicates with the device.
+**/
+return_status spdm_send_receive_key_exchange_ex(
+	IN spdm_context_t *spdm_context, IN uint8 measurement_hash_type,
+	IN uint8 slot_id, OUT uint32 *session_id, OUT uint8 *heartbeat_period,
+	OUT uint8 *req_slot_id_param, OUT void *measurement_hash,
+	IN void *requester_random_in OPTIONAL,
+	OUT void *requester_random OPTIONAL,
+	OUT void *responder_random OPTIONAL)
+{
+	uintn retry;
+	return_status status;
+
+	retry = spdm_context->retry_times;
+	do {
+		status = try_spdm_send_receive_key_exchange(
+			spdm_context, measurement_hash_type, slot_id,
+			session_id, heartbeat_period, req_slot_id_param,
+			measurement_hash, requester_random_in,
+			requester_random, responder_random);
 		if (RETURN_NO_RESPONSE != status) {
 			return status;
 		}

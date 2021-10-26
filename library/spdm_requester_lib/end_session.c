@@ -37,8 +37,6 @@ return_status try_spdm_send_receive_end_session(IN spdm_context_t *spdm_context,
 	spdm_session_info_t *session_info;
 	spdm_session_state_t session_state;
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
-						SPDM_END_SESSION);
 	if (spdm_context->connection_info.connection_state <
 	    SPDM_CONNECTION_STATE_NEGOTIATED) {
 		return RETURN_UNSUPPORTED;
@@ -75,6 +73,9 @@ return_status try_spdm_send_receive_end_session(IN spdm_context_t *spdm_context,
 		return RETURN_DEVICE_ERROR;
 	}
 
+	spdm_reset_message_buffer_via_request_code(spdm_context, session_info,
+						SPDM_END_SESSION);
+
 	spdm_response_size = sizeof(spdm_response);
 	zero_mem(&spdm_response, sizeof(spdm_response));
 	status = spdm_receive_spdm_response(
@@ -87,7 +88,7 @@ return_status try_spdm_send_receive_end_session(IN spdm_context_t *spdm_context,
 	}
 	if (spdm_response.header.request_response_code == SPDM_ERROR) {
 		status = spdm_handle_error_response_main(
-			spdm_context, &session_id, NULL, 0, &spdm_response_size,
+			spdm_context, &session_id, &spdm_response_size,
 			&spdm_response, SPDM_END_SESSION, SPDM_END_SESSION_ACK,
 			sizeof(spdm_end_session_response_mine_t));
 		if (RETURN_ERROR(status)) {

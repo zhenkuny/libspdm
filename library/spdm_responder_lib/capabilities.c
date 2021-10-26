@@ -7,6 +7,36 @@
 #include "spdm_responder_lib_internal.h"
 
 /**
+  This function checks the compability of the received SPDM version,
+  if received version is valid, subsequent spdm communication will follow this version.
+
+  @param  spdm_context           	   A pointer to the SPDM context.
+  @param  version                      The SPMD message version.
+
+
+  @retval True                         The received SPDM version is valid.
+  @retval False                        The received SPDM version is invalid.
+**/
+boolean spdm_check_request_version_compability(IN spdm_context_t *spdm_context, IN uint8 version)
+{
+	uint8 local_ver;
+	uintn index;
+
+	for (index = 0; 
+		index < spdm_context->local_context.version.spdm_version_count; 
+		index++) {
+		local_ver = spdm_get_version_from_version_number(
+						spdm_context->local_context.version.spdm_version[index]);
+		if (local_ver == version) {
+			spdm_context->connection_info.version.major_version = version >> 4;
+			spdm_context->connection_info.version.minor_version = version;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/**
   This function checks the compability of the received CAPABILITES flag.
   Some flags are mutually inclusive/exclusive.
 
@@ -73,11 +103,11 @@ boolean spdm_check_request_flag_compability(IN uint32 capabilities_flag,
 		if (handshake_in_the_clear_cap != 0 && key_ex_cap == 0) {
 			return FALSE;
 		}
-		//Handshake_in_the_clear_cap set and encrypt_cap+mac_cap cleared
-		if ((encrypt_cap == 0 && mac_cap == 0) &&
-		    handshake_in_the_clear_cap != 0) {
-			return FALSE;
-		}
+		//Case "Handshake_in_the_clear_cap set and encrypt_cap+mac_cap cleared"
+		//It will be verified by "Key_ex_cap set and encrypt_cap+mac_cap cleared" and
+		//"Handshake_in_the_clear_cap set and key_ex_cap cleared" in above if statement,
+		//so we don't add new if statement.
+
 		//Pub_key_id_cap set and cert_cap set
 		if (pub_key_id_cap != 0 && cert_cap != 0) {
 			return FALSE;
@@ -140,6 +170,14 @@ return_status spdm_get_response_capabilities(IN void *context,
 		return RETURN_SUCCESS;
 	}
 
+	if (!spdm_check_request_version_compability(
+			spdm_context, spdm_request->header.spdm_version)) {
+		spdm_generate_error_response(spdm_context,
+					     SPDM_ERROR_CODE_INVALID_REQUEST, 0,
+					     response_size, response);
+		return RETURN_SUCCESS;
+	}
+
 	if (spdm_is_version_supported(spdm_context, SPDM_MESSAGE_VERSION_11)) {
 		if (request_size != sizeof(spdm_get_capabilities_request)) {
 			spdm_generate_error_response(
@@ -165,7 +203,7 @@ return_status spdm_get_response_capabilities(IN void *context,
 	}
 	spdm_request_size = request_size;
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	ASSERT(*response_size >= sizeof(spdm_capabilities_response));
@@ -187,7 +225,7 @@ return_status spdm_get_response_capabilities(IN void *context,
 	//
 	// Cache
 	//
-	status = append_managed_buffer(&spdm_context->transcript.message_a, spdm_request,
+	status = spdm_append_message_a(spdm_context, spdm_request,
 			      spdm_request_size);
 	if (RETURN_ERROR(status)) {
 		spdm_generate_error_response(spdm_context,
@@ -195,7 +233,7 @@ return_status spdm_get_response_capabilities(IN void *context,
 						response_size, response);
 		return RETURN_SUCCESS;
 	}
-	status = append_managed_buffer(&spdm_context->transcript.message_a,
+	status = spdm_append_message_a(spdm_context,
 			      spdm_response, *response_size);
 
 	if (RETURN_ERROR(status)) {

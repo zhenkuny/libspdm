@@ -14,18 +14,18 @@
 #include <openssl/bn.h>
 #include <openssl/objects.h>
 
-#define DEFAULT_SM2_ID "1234567812345678"
-
 /**
   Allocates and Initializes one Shang-Mi2 context for subsequent use.
 
   The key is generated before the function returns.
 
+  @param nid cipher NID
+
   @return  Pointer to the Shang-Mi2 context that has been initialized.
-           If the allocations fails, sm2_new() returns NULL.
+           If the allocations fails, sm2_new_by_nid() returns NULL.
 
 **/
-void *sm2_new(void)
+void *sm2_new_by_nid(IN uintn nid)
 {
 	EVP_PKEY_CTX *pkey_ctx;
 	EVP_PKEY_CTX *key_ctx;
@@ -330,7 +330,7 @@ boolean sm2_check_key(IN void *sm2_context)
 }
 
 /**
-  Generates sm2 key and returns sm2 public key (X, Y).
+  Generates sm2 key and returns sm2 public key (X, Y), based upon GB/T 32918.3-2016: SM2 - Part3.
 
   This function generates random secret, and computes the public key (X, Y), which is
   returned via parameter public, public_size.
@@ -359,98 +359,12 @@ boolean sm2_check_key(IN void *sm2_context)
 boolean sm2_generate_key(IN OUT void *sm2_context, OUT uint8 *public,
 			 IN OUT uintn *public_size)
 {
-	EVP_PKEY *pkey;
-	EC_KEY *ec_key;
-	const EC_GROUP *ec_group;
-	boolean ret_val;
-	const EC_POINT *ec_point;
-	BIGNUM *bn_x;
-	BIGNUM *bn_y;
-	int32 openssl_nid;
-	uintn half_size;
-	intn x_size;
-	intn y_size;
-
-	if (sm2_context == NULL || public_size == NULL) {
-		return FALSE;
-	}
-
-	if (public == NULL && *public_size != 0) {
-		return FALSE;
-	}
-
-	pkey = (EVP_PKEY *)sm2_context;
-	if (EVP_PKEY_id(pkey) != EVP_PKEY_SM2) {
-		return FALSE;
-	}
-	EVP_PKEY_set_alias_type(pkey, EVP_PKEY_EC);
-	ec_key = EVP_PKEY_get0_EC_KEY(pkey);
-	EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2);
-
-	ret_val = (boolean)EC_KEY_generate_key(ec_key);
-	if (!ret_val) {
-		return FALSE;
-	}
-	openssl_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(ec_key));
-	switch (openssl_nid) {
-	case NID_sm2:
-		half_size = 32;
-		break;
-	default:
-		return FALSE;
-	}
-	if (*public_size < half_size * 2) {
-		*public_size = half_size * 2;
-		return FALSE;
-	}
-	*public_size = half_size * 2;
-
-	ec_group = EC_KEY_get0_group(ec_key);
-	ec_point = EC_KEY_get0_public_key(ec_key);
-	if (ec_point == NULL) {
-		return FALSE;
-	}
-
-	bn_x = BN_new();
-	bn_y = BN_new();
-	if (bn_x == NULL || bn_y == NULL) {
-		ret_val = FALSE;
-		goto done;
-	}
-
-	ret_val = (boolean)EC_POINT_get_affine_coordinates(ec_group, ec_point,
-							   bn_x, bn_y, NULL);
-	if (!ret_val) {
-		goto done;
-	}
-
-	x_size = BN_num_bytes(bn_x);
-	y_size = BN_num_bytes(bn_y);
-	if (x_size <= 0 || y_size <= 0) {
-		ret_val = FALSE;
-		goto done;
-	}
-	ASSERT((uintn)x_size <= half_size && (uintn)y_size <= half_size);
-
-	if (public != NULL) {
-		zero_mem(public, *public_size);
-		BN_bn2bin(bn_x, &public[0 + half_size - x_size]);
-		BN_bn2bin(bn_y, &public[half_size + half_size - y_size]);
-	}
-	ret_val = TRUE;
-
-done:
-	if (bn_x != NULL) {
-		BN_free(bn_x);
-	}
-	if (bn_y != NULL) {
-		BN_free(bn_y);
-	}
-	return ret_val;
+	// current openssl only supports ECDH with SM2 curve, but does not support SM2-key-exchange.
+	return FALSE;
 }
 
 /**
-  Computes exchanged common key.
+  Computes exchanged common key, based upon GB/T 32918.3-2016: SM2 - Part3.
 
   Given peer's public key (X, Y), this function computes the exchanged common key,
   based on its own context including value of curve parameter and random secret.
@@ -461,114 +375,35 @@ done:
   If peer_public is NULL, then return FALSE.
   If peer_public_size is 0, then return FALSE.
   If key is NULL, then return FALSE.
-  If key_size is not large enough, then return FALSE.
 
-  The peer_public_size is 64. first 32-byte is X, second 32-byte is Y. The key_size is 32.
+  The id_a_size and id_b_size must be smaller than 2^16-1.
+  The peer_public_size is 64. first 32-byte is X, second 32-byte is Y.
+  The key_size must be smaller than 2^32-1, limited by KDF function.
 
   @param[in, out]  sm2_context         Pointer to the sm2 context.
+  @param[in]       hash_nid            hash NID
+  @param[in]       id_a                the ID-A of the key exchange context.
+  @param[in]       id_a_size           size of ID-A key exchange context.
+  @param[in]       id_b                the ID-B of the key exchange context.
+  @param[in]       id_b_size           size of ID-B key exchange context.
   @param[in]       peer_public         Pointer to the peer's public X,Y.
   @param[in]       peer_public_size     size of peer's public X,Y in bytes.
   @param[out]      key                Pointer to the buffer to receive generated key.
-  @param[in, out]  key_size            On input, the size of key buffer in bytes.
-                                      On output, the size of data returned in key buffer in bytes.
+  @param[in]       key_size            On input, the size of key buffer in bytes.
 
   @retval TRUE   sm2 exchanged key generation succeeded.
   @retval FALSE  sm2 exchanged key generation failed.
-  @retval FALSE  key_size is not large enough.
 
 **/
-boolean sm2_compute_key(IN OUT void *sm2_context, IN const uint8 *peer_public,
+boolean sm2_compute_key(IN OUT void *sm2_context, IN uintn hash_nid,
+			IN const uint8 *id_a, IN uintn id_a_size,
+			IN const uint8 *id_b, IN uintn id_b_size,
+			IN const uint8 *peer_public,
 			IN uintn peer_public_size, OUT uint8 *key,
-			IN OUT uintn *key_size)
+			IN uintn key_size)
 {
-	EVP_PKEY *pkey;
-	EC_KEY *ec_key;
-	const EC_GROUP *ec_group;
-	boolean ret_val;
-	BIGNUM *bn_x;
-	BIGNUM *bn_y;
-	EC_POINT *ec_point;
-	int32 openssl_nid;
-	uintn half_size;
-	intn size;
-
-	if (sm2_context == NULL || peer_public == NULL || key_size == NULL ||
-	    key == NULL) {
-		return FALSE;
-	}
-
-	if (peer_public_size > INT_MAX) {
-		return FALSE;
-	}
-
-	pkey = (EVP_PKEY *)sm2_context;
-	if (EVP_PKEY_id(pkey) != EVP_PKEY_SM2) {
-		return FALSE;
-	}
-	EVP_PKEY_set_alias_type(pkey, EVP_PKEY_EC);
-	ec_key = EVP_PKEY_get0_EC_KEY(pkey);
-	EVP_PKEY_set_alias_type(pkey, EVP_PKEY_SM2);
-
-	openssl_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(ec_key));
-	switch (openssl_nid) {
-	case NID_sm2:
-		half_size = 32;
-		break;
-	default:
-		return FALSE;
-	}
-	if (peer_public_size != half_size * 2) {
-		return FALSE;
-	}
-
-	ec_group = EC_KEY_get0_group(ec_key);
-	ec_point = NULL;
-
-	bn_x = BN_bin2bn(peer_public, (uint32)half_size, NULL);
-	bn_y = BN_bin2bn(peer_public + half_size, (uint32)half_size, NULL);
-	if (bn_x == NULL || bn_y == NULL) {
-		ret_val = FALSE;
-		goto done;
-	}
-	ec_point = EC_POINT_new(ec_group);
-	if (ec_point == NULL) {
-		ret_val = FALSE;
-		goto done;
-	}
-
-	ret_val = (boolean)EC_POINT_set_affine_coordinates(ec_group, ec_point,
-							   bn_x, bn_y, NULL);
-	if (!ret_val) {
-		goto done;
-	}
-
-	size = ECDH_compute_key(key, *key_size, ec_point, ec_key, NULL);
-	if (size < 0) {
-		ret_val = FALSE;
-		goto done;
-	}
-
-	if (*key_size < (uintn)size) {
-		*key_size = size;
-		ret_val = FALSE;
-		goto done;
-	}
-
-	*key_size = size;
-
-	ret_val = TRUE;
-
-done:
-	if (bn_x != NULL) {
-		BN_free(bn_x);
-	}
-	if (bn_y != NULL) {
-		BN_free(bn_y);
-	}
-	if (ec_point != NULL) {
-		EC_POINT_free(ec_point);
-	}
-	return ret_val;
+	// current openssl only supports ECDH with SM2 curve, but does not support SM2-key-exchange.
+	return FALSE;
 }
 
 static void ecc_signature_der_to_bin(IN uint8 *der_signature,
@@ -680,7 +515,7 @@ static void ecc_signature_bin_to_der(IN uint8 *signature, IN uintn sig_size,
 }
 
 /**
-  Carries out the SM2 signature.
+  Carries out the SM2 signature, based upon GB/T 32918.2-2016: SM2 - Part2.
 
   This function carries out the SM2 signature.
   If the signature buffer is too small to hold the contents of signature, FALSE
@@ -691,10 +526,13 @@ static void ecc_signature_bin_to_der(IN uint8 *signature, IN uintn sig_size,
   hash_nid must be SM3_256.
   If sig_size is large enough but signature is NULL, then return FALSE.
 
+  The id_a_size must be smaller than 2^16-1.
   The sig_size is 64. first 32-byte is R, second 32-byte is S.
 
   @param[in]       sm2_context   Pointer to sm2 context for signature generation.
   @param[in]       hash_nid      hash NID
+  @param[in]       id_a          the ID-A of the signing context.
+  @param[in]       id_a_size     size of ID-A signing context.
   @param[in]       message      Pointer to octet message to be signed (before hash).
   @param[in]       size         size of the message in bytes.
   @param[out]      signature    Pointer to buffer to receive SM2 signature.
@@ -706,7 +544,8 @@ static void ecc_signature_bin_to_der(IN uint8 *signature, IN uintn sig_size,
   @retval  FALSE  sig_size is too small.
 
 **/
-boolean sm2_ecdsa_sign(IN void *sm2_context, IN uintn hash_nid,
+boolean sm2_dsa_sign(IN void *sm2_context, IN uintn hash_nid,
+		       IN const uint8 *id_a, IN uintn id_a_size,
 		       IN const uint8 *message, IN uintn size,
 		       OUT uint8 *signature, IN OUT uintn *sig_size)
 {
@@ -758,8 +597,8 @@ boolean sm2_ecdsa_sign(IN void *sm2_context, IN uintn hash_nid,
 		EVP_MD_CTX_free(ctx);
 		return FALSE;
 	}
-	result = EVP_PKEY_CTX_set1_id(pkey_ctx, DEFAULT_SM2_ID,
-				      sizeof(DEFAULT_SM2_ID) - 1);
+	result = EVP_PKEY_CTX_set1_id(pkey_ctx, id_a,
+				      id_a_size);
 	if (result <= 0) {
 		EVP_MD_CTX_free(ctx);
 		EVP_PKEY_CTX_free(pkey_ctx);
@@ -791,17 +630,20 @@ boolean sm2_ecdsa_sign(IN void *sm2_context, IN uintn hash_nid,
 }
 
 /**
-  Verifies the SM2 signature.
+  Verifies the SM2 signature, based upon GB/T 32918.2-2016: SM2 - Part2.
 
   If sm2_context is NULL, then return FALSE.
   If message is NULL, then return FALSE.
   If signature is NULL, then return FALSE.
   hash_nid must be SM3_256.
 
+  The id_a_size must be smaller than 2^16-1.
   The sig_size is 64. first 32-byte is R, second 32-byte is S.
 
   @param[in]  sm2_context   Pointer to SM2 context for signature verification.
   @param[in]  hash_nid      hash NID
+  @param[in]  id_a          the ID-A of the signing context.
+  @param[in]  id_a_size     size of ID-A signing context.
   @param[in]  message      Pointer to octet message to be checked (before hash).
   @param[in]  size         size of the message in bytes.
   @param[in]  signature    Pointer to SM2 signature to be verified.
@@ -811,7 +653,8 @@ boolean sm2_ecdsa_sign(IN void *sm2_context, IN uintn hash_nid,
   @retval  FALSE  Invalid signature or invalid sm2 context.
 
 **/
-boolean sm2_ecdsa_verify(IN void *sm2_context, IN uintn hash_nid,
+boolean sm2_dsa_verify(IN void *sm2_context, IN uintn hash_nid,
+			 IN const uint8 *id_a, IN uintn id_a_size,
 			 IN const uint8 *message, IN uintn size,
 			 IN const uint8 *signature, IN uintn sig_size)
 {
@@ -864,8 +707,8 @@ boolean sm2_ecdsa_verify(IN void *sm2_context, IN uintn hash_nid,
 		EVP_MD_CTX_free(ctx);
 		return FALSE;
 	}
-	result = EVP_PKEY_CTX_set1_id(pkey_ctx, DEFAULT_SM2_ID,
-				      sizeof(DEFAULT_SM2_ID) - 1);
+	result = EVP_PKEY_CTX_set1_id(pkey_ctx, id_a,
+				      id_a_size);
 	if (result <= 0) {
 		EVP_MD_CTX_free(ctx);
 		EVP_PKEY_CTX_free(pkey_ctx);

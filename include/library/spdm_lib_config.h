@@ -19,28 +19,54 @@
 #define MAX_SPDM_CERT_CHAIN_BLOCK_LEN 1024
 
 #define MAX_SPDM_MESSAGE_BUFFER_SIZE 0x1200
-#define MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE 0x100
+#define MAX_SPDM_MESSAGE_SMALL_BUFFER_SIZE 0x100  // to hold message_a before negotiate
+#define MAX_SPDM_MESSAGE_MEDIUM_BUFFER_SIZE 0x300 // to hold message_k before finished_key is ready
 
 #define MAX_SPDM_REQUEST_RETRY_TIMES 3
 #define MAX_SPDM_SESSION_STATE_CALLBACK_NUM 4
 #define MAX_SPDM_CONNECTION_STATE_CALLBACK_NUM 4
 
+// If cache transcript data or transcript hash
+#define LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT 0
+
 //
 // Crypto Configuation
 // In each category, at least one should be selected.
 //
-#define OPENSPDM_RSA_SSA_SUPPORT 1
-#define OPENSPDM_RSA_PSS_SUPPORT 1
-#define OPENSPDM_ECDSA_SUPPORT 1
+#define LIBSPDM_RSA_SSA_SUPPORT 1
+#define LIBSPDM_RSA_PSS_SUPPORT 1
+#define LIBSPDM_ECDSA_SUPPORT 1
 
-#define OPENSPDM_FFDHE_SUPPORT 1
-#define OPENSPDM_ECDHE_SUPPORT 1
+#define LIBSPDM_FFDHE_SUPPORT 1
+#define LIBSPDM_ECDHE_SUPPORT 1
 
-#define OPENSPDM_AEAD_GCM_SUPPORT 1
-#define OPENSPDM_AEAD_CHACHA20_POLY1305_SUPPORT 1
+#define LIBSPDM_AEAD_GCM_SUPPORT 1
+#define LIBSPDM_AEAD_CHACHA20_POLY1305_SUPPORT 1
 
-#define OPENSPDM_SHA256_SUPPORT 1
-#define OPENSPDM_SHA384_SUPPORT 1
-#define OPENSPDM_SHA512_SUPPORT 1
+#define LIBSPDM_SHA256_SUPPORT 1
+#define LIBSPDM_SHA384_SUPPORT 1
+#define LIBSPDM_SHA512_SUPPORT 1
+
+
+// Code space optimization for Optional request/response messages.
+//
+// Consumers of libspdm may wish to not fully implement all of the optional
+// SPDM request/response messages. Therefore we have provided these
+// SPDM_ENABLE_CAPABILITY_***_CAP compile time switches as an optimization
+// disable the code (#if 0) related to said optional capability, thereby
+// reducing the code space used in the image.
+//
+// A single switch may enable/disable a single capability or group of related
+// capabilities.
+//
+// SPDM_ENABLE_CAPABILITY_CERT_CAP - Enable/Disable single CERT capability.
+// SPDM_ENABLE_CAPABILITY_CHAL_CAP - Enable/Disable single CHAL capability.
+// SPDM_ENABLE_CAPABILTIY_MEAS_CAP - Enable/Disables multiple MEAS capabilities:
+//                                  (MEAS_CAP_NO_SIG, MEAS_CAP_SIG, MEAS_FRESH_CAP)
+//
+
+#define SPDM_ENABLE_CAPABILITY_CERT_CAP 1
+#define SPDM_ENABLE_CAPABILITY_CHAL_CAP 1
+#define SPDM_ENABLE_CAPABILITY_MEAS_CAP 1
 
 #endif

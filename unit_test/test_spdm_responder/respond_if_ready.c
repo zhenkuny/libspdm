@@ -124,6 +124,7 @@ spdm_response_if_ready_request_t    m_spdm_respond_if_ready_request11 = {
 };
 uintn m_spdm_respond_if_ready_request11_size = sizeof(spdm_message_header_t);
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 spdm_get_digest_request_t    m_spdm_get_digest_request = {
   {
     SPDM_MESSAGE_VERSION_11,
@@ -146,6 +147,10 @@ spdm_get_certificate_request_t    m_spdm_get_certificate_request = {
 };
 uintn m_spdm_get_certificate_request_size = sizeof(m_spdm_get_certificate_request);
 
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
 spdm_challenge_request_t    m_spdm_challenge_request = {
   {
     SPDM_MESSAGE_VERSION_11,
@@ -156,6 +161,9 @@ spdm_challenge_request_t    m_spdm_challenge_request = {
 };
 uintn m_spdm_challenge_request_size = sizeof(m_spdm_challenge_request);
 
+#endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
+#if SPDM_ENABLE_CAPABILITY_MEAS_CAP
 spdm_get_measurements_request_t    m_spdm_get_measurements_request = {
   {
     SPDM_MESSAGE_VERSION_11,
@@ -165,6 +173,7 @@ spdm_get_measurements_request_t    m_spdm_get_measurements_request = {
   },
 };
 uintn m_spdm_get_measurements_request_size = sizeof(spdm_message_header_t);
+#endif // SPDM_ENABLE_CAPABILITY_MEAS_CAP
 
 #pragma pack(1)
 
@@ -263,8 +272,10 @@ static void spdm_secured_message_set_request_finished_key(
 	ASSERT(key_size == secured_message_context->hash_size);
 	copy_mem(secured_message_context->handshake_secret.request_finished_key,
 		 key, secured_message_context->hash_size);
+	secured_message_context->finished_key_ready = TRUE;
 }
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 /**
   Test 1: receiving a correct RESPOND_IF_READY from the requester, after a 
   GET_DIGESTS could not be processed.
@@ -289,9 +300,9 @@ void test_spdm_responder_respond_if_ready_case1(void **state) {
   spdm_context->local_context.capability.flags = 0;
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CERT_CAP;
   spdm_context->connection_info.algorithm.base_hash_algo = m_use_hash_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.local_cert_chain_provision[0] = m_local_certificate_chain;
   spdm_context->local_context.local_cert_chain_provision_size[0] = MAX_SPDM_MESSAGE_BUFFER_SIZE;
   set_mem (m_local_certificate_chain, MAX_SPDM_MESSAGE_BUFFER_SIZE, (uint8)(0xFF));
@@ -317,12 +328,17 @@ void test_spdm_responder_respond_if_ready_case1(void **state) {
   assert_int_equal (spdm_response->header.request_response_code, SPDM_DIGESTS);
 }
 
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 /**
   Test 2: receiving a correct RESPOND_IF_READY from the requester, after a 
   GET_CERTIFICATE could not be processed.
   Expected behavior: the responder accepts the request and produces a valid CERTIFICATE
   response message.
 **/
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 void test_spdm_responder_respond_if_ready_case2(void **state) {
   return_status        status;
   spdm_test_context_t    *spdm_test_context;
@@ -344,9 +360,9 @@ void test_spdm_responder_respond_if_ready_case2(void **state) {
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CERT_CAP;
   spdm_context->connection_info.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->connection_info.algorithm.base_asym_algo = m_use_asym_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   read_responder_public_certificate_chain (m_use_hash_algo, m_use_asym_algo, &data, &data_size, NULL, NULL);
   spdm_context->local_context.local_cert_chain_provision[0] = data;
   spdm_context->local_context.local_cert_chain_provision_size[0] = data_size;
@@ -376,12 +392,15 @@ void test_spdm_responder_respond_if_ready_case2(void **state) {
   free(data);
 }
 
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 /**
   Test 3: receiving a correct RESPOND_IF_READY from the requester, after a 
   CHALLENGE could not be processed.
   Expected behavior: the responder accepts the request and produces a valid CHALLENGE_AUTH
   response message.
 **/
+#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
 void test_spdm_responder_respond_if_ready_case3(void **state) {
   return_status        status;
   spdm_test_context_t    *spdm_test_context;
@@ -406,9 +425,9 @@ void test_spdm_responder_respond_if_ready_case3(void **state) {
   spdm_context->connection_info.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->connection_info.algorithm.measurement_spec = m_use_measurement_spec;
   spdm_context->connection_info.algorithm.measurement_hash_algo = m_use_measurement_hash_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   read_responder_public_certificate_chain (m_use_hash_algo, m_use_asym_algo, &data, &data_size, NULL, NULL);
   spdm_context->local_context.local_cert_chain_provision[0] = data;
   spdm_context->local_context.local_cert_chain_provision_size[0] = data_size;
@@ -438,6 +457,7 @@ void test_spdm_responder_respond_if_ready_case3(void **state) {
   assert_int_equal (spdm_response->header.param2, 1 << 0);
   free(data);
 }
+#endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP
 
 /**
   Test 4: receiving a correct RESPOND_IF_READY from the requester, after a 
@@ -445,6 +465,9 @@ void test_spdm_responder_respond_if_ready_case3(void **state) {
   Expected behavior: the responder accepts the request and produces a valid MEASUREMENTS
   response message.
 **/
+
+#if SPDM_ENABLE_CAPABILITY_MEAS_CAP
+
 void test_spdm_responder_respond_if_ready_case4(void **state) {
   return_status        status;
   spdm_test_context_t    *spdm_test_context;
@@ -466,9 +489,9 @@ void test_spdm_responder_respond_if_ready_case4(void **state) {
   spdm_context->connection_info.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->connection_info.algorithm.measurement_spec = m_use_measurement_spec;
   spdm_context->connection_info.algorithm.measurement_hash_algo = m_use_measurement_hash_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.opaque_measurement_rsp_size = 0;
   spdm_context->local_context.opaque_measurement_rsp = NULL;
 
@@ -493,6 +516,8 @@ void test_spdm_responder_respond_if_ready_case4(void **state) {
   assert_int_equal (spdm_response->header.request_response_code, SPDM_MEASUREMENTS);
   assert_int_equal (spdm_response->header.param1, MEASUREMENT_BLOCK_NUMBER);
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_MEAS_CAP
 
 /**
   Test 5: receiving a correct RESPOND_IF_READY from the requester, after a 
@@ -530,9 +555,9 @@ void test_spdm_responder_respond_if_ready_case5(void **state) {
   spdm_context->connection_info.algorithm.measurement_hash_algo = m_use_measurement_hash_algo;
   spdm_context->connection_info.algorithm.dhe_named_group = m_use_dhe_algo;
   spdm_context->connection_info.algorithm.aead_cipher_suite = m_use_aead_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   read_responder_public_certificate_chain (m_use_hash_algo, m_use_asym_algo, &data, &data_size, NULL, NULL);
   spdm_context->local_context.local_cert_chain_provision[0] = data;
   spdm_context->local_context.local_cert_chain_provision_size[0] = data_size;
@@ -624,9 +649,9 @@ void test_spdm_responder_respond_if_ready_case6(void **state) {
   spdm_context->connection_info.algorithm.measurement_hash_algo = m_use_measurement_hash_algo;
   spdm_context->connection_info.algorithm.dhe_named_group = m_use_dhe_algo;
   spdm_context->connection_info.algorithm.aead_cipher_suite = m_use_aead_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   read_responder_public_certificate_chain (m_use_hash_algo, m_use_asym_algo, &data, &data_size, NULL, NULL);
   spdm_context->local_context.local_cert_chain_provision[0] = data;
   spdm_context->local_context.local_cert_chain_provision_size[0] = data_size;
@@ -648,8 +673,8 @@ void test_spdm_responder_respond_if_ready_case6(void **state) {
   hmac_size = spdm_get_hash_size (m_use_hash_algo);
   ptr = m_spdm_finish_request.signature;
   init_managed_buffer (&th_curr, MAX_SPDM_MESSAGE_BUFFER_SIZE);
-  cert_buffer = (uint8 *)data + sizeof(spdm_cert_chain_t) + hash_size;
-  cert_buffer_size = data_size - (sizeof(spdm_cert_chain_t) + hash_size);
+  cert_buffer = (uint8 *)data;
+  cert_buffer_size = data_size;
   spdm_hash_all (m_use_hash_algo, cert_buffer, cert_buffer_size, cert_buffer_hash);
   // Transcript.MessageA size is 0
   append_managed_buffer (&th_curr, cert_buffer_hash, hash_size);
@@ -717,9 +742,9 @@ void test_spdm_responder_respond_if_ready_case7(void **state) {
   spdm_context->connection_info.algorithm.dhe_named_group = m_use_dhe_algo;
   spdm_context->connection_info.algorithm.aead_cipher_suite = m_use_aead_algo;
   spdm_context->connection_info.algorithm.key_schedule = m_use_key_schedule_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   read_responder_public_certificate_chain (m_use_hash_algo, m_use_asym_algo, &data, &data_size, NULL, NULL);
   spdm_context->local_context.local_cert_chain_provision[0] = data;
   spdm_context->local_context.local_cert_chain_provision_size[0] = data_size;
@@ -811,9 +836,9 @@ void test_spdm_responder_respond_if_ready_case8(void **state) {
   spdm_context->connection_info.algorithm.measurement_hash_algo = m_use_measurement_hash_algo;
   spdm_context->connection_info.algorithm.dhe_named_group = m_use_dhe_algo;
   spdm_context->connection_info.algorithm.aead_cipher_suite = m_use_aead_algo;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   read_responder_public_certificate_chain (m_use_hash_algo, m_use_asym_algo, &data, &data_size, NULL, NULL);
   spdm_context->local_context.local_cert_chain_provision[0] = data;
   spdm_context->local_context.local_cert_chain_provision_size[0] = data_size;
@@ -831,7 +856,7 @@ void test_spdm_responder_respond_if_ready_case8(void **state) {
   spdm_context->last_spdm_request_session_id_valid = TRUE;
   spdm_context->last_spdm_request_session_id = session_id;
   session_info = &spdm_context->session_info[0];
-  spdm_session_info_init (spdm_context, session_info, session_id, FALSE);
+  spdm_session_info_init (spdm_context, session_info, session_id, TRUE);
   hash_size = spdm_get_hash_size (m_use_hash_algo);
   set_mem (dummy_buffer, hash_size, (uint8)(0xFF));
   spdm_secured_message_set_request_finished_key (session_info->secured_message_context, dummy_buffer, hash_size);
@@ -868,6 +893,8 @@ void test_spdm_responder_respond_if_ready_case8(void **state) {
   free(data);
   spdm_free_session_id (spdm_context, (0xFFFFFFFF));
 }
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 
 /**
   Test 9: receiving a RESPOND_IF_READY message larger than specified (more parameters 
@@ -918,6 +945,9 @@ void test_spdm_responder_respond_if_ready_case9(void **state) {
   assert_int_equal (spdm_response->header.param2, 0);
 }
 
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 /**
   Test 10: receiving a correct RESPOND_IF_READY from the requester, but the responder is in
   a Busy state.
@@ -968,6 +998,9 @@ void test_spdm_responder_respond_if_ready_case10(void **state) {
   assert_int_equal (spdm_context->response_state, SPDM_RESPONSE_STATE_BUSY);
 }
 
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 /**
   Test 11: receiving a correct RESPOND_IF_READY from the requester, but the responder requires
   resynchronization with the requester.
@@ -1017,6 +1050,10 @@ void test_spdm_responder_respond_if_ready_case11(void **state) {
   assert_int_equal (spdm_response->header.param2, 0);
   assert_int_equal (spdm_context->response_state, SPDM_RESPONSE_STATE_NEED_RESYNC);
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 
 /**
   Test 12: receiving a correct RESPOND_IF_READY from the requester, but the responder could not
@@ -1072,6 +1109,10 @@ void test_spdm_responder_respond_if_ready_case12(void **state) {
   assert_int_equal (error_data->token, MY_TEST_TOKEN);
 }
 
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
+
 /**
   Test 13: receiving a correct RESPOND_IF_READY from the requester, with the correct original
   request code, but with a token different from the expected.
@@ -1120,7 +1161,9 @@ void test_spdm_responder_respond_if_ready_case13(void **state) {
   assert_int_equal (spdm_response->header.param1, SPDM_ERROR_CODE_INVALID_REQUEST);
   assert_int_equal (spdm_response->header.param2, 0);
 }
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
 
+#if SPDM_ENABLE_CAPABILITY_CERT_CAP
 /**
   Test 14: receiving a correct RESPOND_IF_READY from the requester, with the correct token, 
   but with a request code different from the expected.
@@ -1169,6 +1212,7 @@ void test_spdm_responder_respond_if_ready_case14(void **state) {
   assert_int_equal (spdm_response->header.param1, SPDM_ERROR_CODE_INVALID_REQUEST);
   assert_int_equal (spdm_response->header.param2, 0);
 }
+#endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
 
 spdm_test_context_t       m_spdm_responder_respond_if_ready_test_context = {
   SPDM_TEST_CONTEXT_SIGNATURE,
@@ -1178,20 +1222,33 @@ spdm_test_context_t       m_spdm_responder_respond_if_ready_test_context = {
 int spdm_responder_respond_if_ready_test_main(void) {
   const struct CMUnitTest spdm_responder_respond_if_ready_tests[] = {
     // Success Case
+    #if SPDM_ENABLE_CAPABILITY_CERT_CAP
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case1),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case2),
+    #endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
+    #if SPDM_ENABLE_CAPABILITY_CHAL_CAP
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case3),
+    #endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
+    #if SPDM_ENABLE_CAPABILITY_MEAS_CAP
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case4),
+    #endif // SPDM_ENABLE_CAPABILITY_MEAS_CAP
+
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case5),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case6),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case7),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case8),
+
+    #if SPDM_ENABLE_CAPABILITY_CERT_CAP
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case9),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case10),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case11),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case12),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case13),
     cmocka_unit_test(test_spdm_responder_respond_if_ready_case14),
+    #endif // SPDM_ENABLE_CAPABILITY_CERT_CAP
+
   };
 
   setup_spdm_test_context (&m_spdm_responder_respond_if_ready_test_context);

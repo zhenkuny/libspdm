@@ -22,6 +22,89 @@
 #define MAX_AEAD_IV_SIZE 12
 
 /**
+  Allocates and initializes one HASH_CTX context for subsequent hash use.
+
+  @return  Pointer to the HASH_CTX context that has been initialized.
+           If the allocations fails, hash_new_func() returns NULL.
+**/
+typedef void * (*hash_new_func)();
+
+/**
+  Release the specified HASH_CTX context.
+
+  @param  hash_context                   Pointer to the HASH_CTX context to be released.
+**/
+typedef void (*hash_free_func)(IN void *hash_context);
+
+/**
+  Initializes user-supplied memory pointed by hash_context as hash context for
+  subsequent use.
+
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  hash_context                   Pointer to hash context being initialized.
+
+  @retval TRUE   Hash context initialization succeeded.
+  @retval FALSE  Hash context initialization failed.
+**/
+typedef boolean (*hash_init_func)(OUT void *hash_context);
+
+/**
+  Makes a copy of an existing hash context.
+
+  If hash_ctx is NULL, then return FALSE.
+  If new_hash_ctx is NULL, then return FALSE.
+
+  @param[in]  hash_ctx     Pointer to hash context being copied.
+  @param[out] new_hash_ctx  Pointer to new hash context.
+
+  @retval TRUE   hash context copy succeeded.
+  @retval FALSE  hash context copy failed.
+
+**/
+typedef boolean (*hash_duplicate_func)(IN const void *hash_ctx,
+			      OUT void *new_hash_ctx);
+
+/**
+  Digests the input data and updates hash context.
+
+  This function performs hash digest on a data buffer of the specified size.
+  It can be called multiple times to compute the digest of long or discontinuous data streams.
+  Hash context should be already correctly initialized by hash_init(), and should not be finalized
+  by hash_final(). Behavior with invalid context is undefined.
+
+  If hash_context is NULL, then return FALSE.
+
+  @param[in, out]  hash_context   Pointer to the MD context.
+  @param[in]       data           Pointer to the buffer containing the data to be hashed.
+  @param[in]       data_size      Size of data buffer in bytes.
+
+  @retval TRUE   hash data digest succeeded.
+  @retval FALSE  hash data digest failed.
+**/
+typedef boolean (*hash_update_func)(IN OUT void *hash_context, IN const void *data,
+		      IN uintn data_size);
+
+/**
+  Completes computation of the hash digest value.
+
+  This function completes hash computation and retrieves the digest value into
+  the specified memory. After this function has been called, the hash context cannot
+  be used again.
+  hash context should be already correctly initialized by hash_init(), and should not be
+  finalized by hash_final(). Behavior with invalid hash context is undefined.
+
+  If hash_context is NULL, then return FALSE.
+  If hash_value is NULL, then return FALSE.
+
+  @param[in, out]  hash_context    Pointer to the hash context.
+  @param[out]      hash_value      Pointer to a buffer that receives the hash digest value.
+
+  @retval TRUE   hash digest computation succeeded.
+  @retval FALSE  hash digest computation failed.
+**/
+typedef boolean (*hash_final_func)(IN OUT void *hash_context, OUT uint8 *hash_value);
+
+/**
   Computes the hash of a input data buffer.
 
   This function performs the hash of a given data buffer, and return the hash value.
@@ -35,6 +118,95 @@
 **/
 typedef boolean (*hash_all_func)(IN const void *data, IN uintn data_size,
 				 OUT uint8 *hash_value);
+
+/**
+  Allocates and initializes one HMAC context for subsequent hash use.
+
+  @return  Pointer to the HMAC context that has been initialized.
+           If the allocations fails, hmac_new_func() returns NULL.
+**/
+typedef void * (*hmac_new_func)();
+
+/**
+  Release the specified HMAC context.
+
+  @param  hmac_ctx                   Pointer to the HMAC context to be released.
+**/
+typedef void (*hmac_free_func)(IN void *hmac_ctx);
+
+/**
+  Set user-supplied key for subsequent use. It must be done before any
+  calling to hmac_update().
+
+  If hmac_ctx is NULL, then return FALSE.
+
+  @param[out]  hmac_ctx  Pointer to HMAC context.
+  @param[in]   key                Pointer to the user-supplied key.
+  @param[in]   key_size            key size in bytes.
+
+  @retval TRUE   The key is set successfully.
+  @retval FALSE  The key is set unsuccessfully.
+
+**/
+typedef boolean (*hmac_set_key_func)(OUT void *hmac_ctx, IN const uint8 *key,
+			    IN uintn key_size);
+
+/**
+  Makes a copy of an existing HMAC context.
+
+  If hmac_ctx is NULL, then return FALSE.
+  If new_hmac_ctx is NULL, then return FALSE.
+
+  @param[in]  hmac_ctx     Pointer to HMAC context being copied.
+  @param[out] new_hmac_ctx  Pointer to new HMAC context.
+
+  @retval TRUE   HMAC context copy succeeded.
+  @retval FALSE  HMAC context copy failed.
+
+**/
+typedef boolean (*hmac_duplicate_func)(IN const void *hmac_ctx,
+			      OUT void *new_hmac_ctx);
+
+/**
+  Digests the input data and updates HMAC context.
+
+  This function performs HMAC digest on a data buffer of the specified size.
+  It can be called multiple times to compute the digest of long or discontinuous data streams.
+  HMAC context should be initialized by hmac_new(), and should not be finalized
+  by hmac_final(). Behavior with invalid context is undefined.
+
+  If hmac_ctx is NULL, then return FALSE.
+
+  @param[in, out]  hmac_ctx Pointer to the HMAC context.
+  @param[in]       data              Pointer to the buffer containing the data to be digested.
+  @param[in]       data_size          size of data buffer in bytes.
+
+  @retval TRUE   HMAC data digest succeeded.
+  @retval FALSE  HMAC data digest failed.
+
+**/
+typedef boolean (*hmac_update_func)(IN OUT void *hmac_ctx, IN const void *data,
+			   IN uintn data_size);
+
+/**
+  Completes computation of the HMAC digest value.
+
+  This function completes HMAC hash computation and retrieves the digest value into
+  the specified memory. After this function has been called, the HMAC context cannot
+  be used again.
+
+  If hmac_ctx is NULL, then return FALSE.
+  If hmac_value is NULL, then return FALSE.
+
+  @param[in, out]  hmac_ctx  Pointer to the HMAC context.
+  @param[out]      hmac_value          Pointer to a buffer that receives the HMAC digest
+                                      value.
+
+  @retval TRUE   HMAC digest computation succeeded.
+  @retval FALSE  HMAC digest computation failed.
+
+**/
+typedef boolean (*hmac_final_func)(IN OUT void *hmac_ctx, OUT uint8 *hmac_value);
 
 /**
   Computes the HMAC of a input data buffer.
@@ -271,6 +443,185 @@ typedef boolean (*aead_decrypt_func)(
 uint32 spdm_get_hash_size(IN uint32 base_hash_algo);
 
 /**
+  Allocates and initializes one HASH_CTX context for subsequent hash use.
+
+  @param  base_hash_algo                 SPDM base_hash_algo
+
+  @return  Pointer to the HASH_CTX context that has been initialized.
+           If the allocations fails, spdm_hash_new() returns NULL.
+**/
+void *spdm_hash_new(IN uint32 base_hash_algo);
+
+/**
+  Release the specified HASH_CTX context.
+
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  hash_context                   Pointer to the HASH_CTX context to be released.
+**/
+void spdm_hash_free(IN uint32 base_hash_algo, IN void *hash_context);
+
+/**
+  Initializes user-supplied memory pointed by hash_context as hash context for
+  subsequent use.
+
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  hash_context                   Pointer to hash context being initialized.
+
+  @retval TRUE   Hash context initialization succeeded.
+  @retval FALSE  Hash context initialization failed.
+**/
+boolean spdm_hash_init(IN uint32 base_hash_algo, OUT void *hash_context);
+
+/**
+  Makes a copy of an existing hash context.
+
+  If hash_ctx is NULL, then return FALSE.
+  If new_hash_ctx is NULL, then return FALSE.
+
+  @param[in]  hash_ctx     Pointer to hash context being copied.
+  @param[out] new_hash_ctx  Pointer to new hash context.
+
+  @retval TRUE   hash context copy succeeded.
+  @retval FALSE  hash context copy failed.
+
+**/
+boolean spdm_hash_duplicate(IN uint32 base_hash_algo,
+			  IN const void *hash_ctx, OUT void *new_hash_ctx);
+
+/**
+  Digests the input data and updates hash context.
+
+  This function performs hash digest on a data buffer of the specified size.
+  It can be called multiple times to compute the digest of long or discontinuous data streams.
+  Hash context should be already correctly initialized by hash_init(), and should not be finalized
+  by hash_final(). Behavior with invalid context is undefined.
+
+  If hash_context is NULL, then return FALSE.
+
+  @param[in, out]  hash_context   Pointer to the MD context.
+  @param[in]       data           Pointer to the buffer containing the data to be hashed.
+  @param[in]       data_size      Size of data buffer in bytes.
+
+  @retval TRUE   hash data digest succeeded.
+  @retval FALSE  hash data digest failed.
+**/
+boolean spdm_hash_update(IN uint32 base_hash_algo, IN OUT void *hash_context,
+			  IN const void *data, IN uintn data_size);
+
+/**
+  Completes computation of the hash digest value.
+
+  This function completes hash computation and retrieves the digest value into
+  the specified memory. After this function has been called, the hash context cannot
+  be used again.
+  hash context should be already correctly initialized by hash_init(), and should not be
+  finalized by hash_final(). Behavior with invalid hash context is undefined.
+
+  If hash_context is NULL, then return FALSE.
+  If hash_value is NULL, then return FALSE.
+
+  @param[in, out]  hash_context    Pointer to the hash context.
+  @param[out]      hash_value      Pointer to a buffer that receives the hash digest value.
+
+  @retval TRUE   hash digest computation succeeded.
+  @retval FALSE  hash digest computation failed.
+**/
+boolean spdm_hash_final(IN uint32 base_hash_algo, IN OUT void *hash_context, OUT uint8 *hash_value);
+
+/**
+  Allocates and initializes one HMAC context for subsequent use.
+
+  @param  base_hash_algo                 SPDM base_hash_algo
+
+  @return  Pointer to the HMAC context that has been initialized.
+           If the allocations fails, spdm_hash_new() returns NULL.
+**/
+void *spdm_hmac_new(IN uint32 base_hash_algo);
+
+/**
+  Release the specified HMAC context.
+
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  hmac_ctx                   Pointer to the HMAC context to be released.
+**/
+void spdm_hmac_free(IN uint32 base_hash_algo, IN void *hmac_ctx);
+
+/**
+  Set user-supplied key for subsequent use. It must be done before any
+  calling to hmac_update().
+
+  If hmac_ctx is NULL, then return FALSE.
+
+  @param[out]  hmac_ctx  Pointer to HMAC context.
+  @param[in]   key                Pointer to the user-supplied key.
+  @param[in]   key_size            key size in bytes.
+
+  @retval TRUE   The key is set successfully.
+  @retval FALSE  The key is set unsuccessfully.
+
+**/
+boolean spdm_hmac_init(IN uint32 base_hash_algo,
+			  OUT void *hmac_ctx, IN const uint8 *key,
+		      IN uintn key_size);
+
+/**
+  Makes a copy of an existing HMAC context.
+
+  If hmac_ctx is NULL, then return FALSE.
+  If new_hmac_ctx is NULL, then return FALSE.
+
+  @param[in]  hmac_ctx     Pointer to HMAC context being copied.
+  @param[out] new_hmac_ctx  Pointer to new HMAC context.
+
+  @retval TRUE   HMAC context copy succeeded.
+  @retval FALSE  HMAC context copy failed.
+
+**/
+boolean spdm_hmac_duplicate(IN uint32 base_hash_algo,
+			  IN const void *hmac_ctx, OUT void *new_hmac_ctx);
+/**
+  Digests the input data and updates HMAC context.
+
+  This function performs HMAC digest on a data buffer of the specified size.
+  It can be called multiple times to compute the digest of long or discontinuous data streams.
+  HMAC context should be initialized by hmac_new(), and should not be finalized
+  by hmac_final(). Behavior with invalid context is undefined.
+
+  If hmac_ctx is NULL, then return FALSE.
+
+  @param[in, out]  hmac_ctx Pointer to the HMAC context.
+  @param[in]       data              Pointer to the buffer containing the data to be digested.
+  @param[in]       data_size          size of data buffer in bytes.
+
+  @retval TRUE   HMAC data digest succeeded.
+  @retval FALSE  HMAC data digest failed.
+
+**/
+boolean spdm_hmac_update(IN uint32 base_hash_algo,
+			  OUT void *hmac_ctx, IN const void *data,
+			   IN uintn data_size);
+/**
+  Completes computation of the HMAC digest value.
+
+  This function completes HMAC hash computation and retrieves the digest value into
+  the specified memory. After this function has been called, the HMAC context cannot
+  be used again.
+
+  If hmac_ctx is NULL, then return FALSE.
+  If hmac_value is NULL, then return FALSE.
+
+  @param[in, out]  hmac_ctx  Pointer to the HMAC context.
+  @param[out]      hmac_value          Pointer to a buffer that receives the HMAC digest
+                                      value.
+
+  @retval TRUE   HMAC digest computation succeeded.
+  @retval FALSE  HMAC digest computation failed.
+
+**/
+boolean spdm_hmac_final(IN uint32 base_hash_algo,
+			  OUT void *hmac_ctx,  OUT uint8 *hmac_value);
+
+/**
   Computes the hash of a input data buffer, based upon the negotiated hash algorithm.
 
   This function performs the hash of a given data buffer, and return the hash value.
@@ -401,9 +752,33 @@ void spdm_asym_free(IN uint32 base_asym_algo, IN void *context);
   @retval  TRUE   Valid asymmetric signature.
   @retval  FALSE  Invalid asymmetric signature or invalid asymmetric context.
 **/
-boolean spdm_asym_verify(IN uint32 base_asym_algo, IN uint32 base_hash_algo,
+boolean spdm_asym_verify(
+			 IN spdm_version_number_t spdm_version, IN uint8 op_code,
+			 IN uint32 base_asym_algo, IN uint32 base_hash_algo,
 			 IN void *context, IN const uint8 *message,
 			 IN uintn message_size, IN const uint8 *signature,
+			 IN uintn sig_size);
+
+/**
+  Verifies the asymmetric signature,
+  based upon negotiated asymmetric algorithm.
+
+  @param  base_asym_algo                 SPDM base_asym_algo
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  context                      Pointer to asymmetric context for signature verification.
+  @param  message_hash                      Pointer to octet message hash to be checked (after hash).
+  @param  hash_size                  size of the hash in bytes.
+  @param  signature                    Pointer to asymmetric signature to be verified.
+  @param  sig_size                      size of signature in bytes.
+
+  @retval  TRUE   Valid asymmetric signature.
+  @retval  FALSE  Invalid asymmetric signature or invalid asymmetric context.
+**/
+boolean spdm_asym_verify_hash(
+			 IN spdm_version_number_t spdm_version, IN uint8 op_code,
+			 IN uint32 base_asym_algo, IN uint32 base_hash_algo,
+			 IN void *context, IN const uint8 *message_hash,
+			 IN uintn hash_size, IN const uint8 *signature,
 			 IN uintn sig_size);
 
 /**
@@ -444,9 +819,37 @@ boolean spdm_asym_get_private_key_from_pem(IN uint32 base_asym_algo,
   @retval  FALSE  signature generation failed.
   @retval  FALSE  sig_size is too small.
 **/
-boolean spdm_asym_sign(IN uint32 base_asym_algo, IN uint32 base_hash_algo,
+boolean spdm_asym_sign(
+		       IN spdm_version_number_t spdm_version, IN uint8 op_code,
+		       IN uint32 base_asym_algo, IN uint32 base_hash_algo,
 		       IN void *context, IN const uint8 *message,
 		       IN uintn message_size, OUT uint8 *signature,
+		       IN OUT uintn *sig_size);
+
+/**
+  Carries out the signature generation.
+
+  If the signature buffer is too small to hold the contents of signature, FALSE
+  is returned and sig_size is set to the required buffer size to obtain the signature.
+
+  @param  base_asym_algo                 SPDM base_asym_algo
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  context                      Pointer to asymmetric context for signature generation.
+  @param  message_hash                      Pointer to octet message hash to be signed (after hash).
+  @param  hash_size                  size of the hash in bytes.
+  @param  signature                    Pointer to buffer to receive signature.
+  @param  sig_size                      On input, the size of signature buffer in bytes.
+                                       On output, the size of data returned in signature buffer in bytes.
+
+  @retval  TRUE   signature successfully generated.
+  @retval  FALSE  signature generation failed.
+  @retval  FALSE  sig_size is too small.
+**/
+boolean spdm_asym_sign_hash(
+		       IN spdm_version_number_t spdm_version, IN uint8 op_code,
+		       IN uint32 base_asym_algo, IN uint32 base_hash_algo,
+		       IN void *context, IN const uint8 *message_hash,
+		       IN uintn hash_size, OUT uint8 *signature,
 		       IN OUT uintn *sig_size);
 
 /**
@@ -500,9 +903,33 @@ void spdm_req_asym_free(IN uint16 req_base_asym_alg, IN void *context);
   @retval  TRUE   Valid asymmetric signature.
   @retval  FALSE  Invalid asymmetric signature or invalid asymmetric context.
 **/
-boolean spdm_req_asym_verify(IN uint16 req_base_asym_alg,
+boolean spdm_req_asym_verify(
+			     IN spdm_version_number_t spdm_version, IN uint8 op_code,
+			     IN uint16 req_base_asym_alg,
 			     IN uint32 base_hash_algo, IN void *context,
 			     IN const uint8 *message, IN uintn message_size,
+			     IN const uint8 *signature, IN uintn sig_size);
+
+/**
+  Verifies the asymmetric signature,
+  based upon negotiated requester asymmetric algorithm.
+
+  @param  req_base_asym_alg               SPDM req_base_asym_alg
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  context                      Pointer to asymmetric context for signature verification.
+  @param  message_hash                      Pointer to octet message hash to be checked (after hash).
+  @param  hash_size                  size of the hash in bytes.
+  @param  signature                    Pointer to asymmetric signature to be verified.
+  @param  sig_size                      size of signature in bytes.
+
+  @retval  TRUE   Valid asymmetric signature.
+  @retval  FALSE  Invalid asymmetric signature or invalid asymmetric context.
+**/
+boolean spdm_req_asym_verify_hash(
+			     IN spdm_version_number_t spdm_version, IN uint8 op_code,
+			     IN uint16 req_base_asym_alg,
+			     IN uint32 base_hash_algo, IN void *context,
+			     IN const uint8 *message_hash, IN uintn hash_size,
 			     IN const uint8 *signature, IN uintn sig_size);
 
 /**
@@ -543,9 +970,37 @@ boolean spdm_req_asym_get_private_key_from_pem(IN uint16 req_base_asym_alg,
   @retval  FALSE  signature generation failed.
   @retval  FALSE  sig_size is too small.
 **/
-boolean spdm_req_asym_sign(IN uint16 req_base_asym_alg,
+boolean spdm_req_asym_sign(
+			   IN spdm_version_number_t spdm_version, IN uint8 op_code,
+			   IN uint16 req_base_asym_alg,
 			   IN uint32 base_hash_algo, IN void *context,
 			   IN const uint8 *message, IN uintn message_size,
+			   OUT uint8 *signature, IN OUT uintn *sig_size);
+
+/**
+  Carries out the signature generation.
+
+  If the signature buffer is too small to hold the contents of signature, FALSE
+  is returned and sig_size is set to the required buffer size to obtain the signature.
+
+  @param  req_base_asym_alg               SPDM req_base_asym_alg
+  @param  base_hash_algo                 SPDM base_hash_algo
+  @param  context                      Pointer to asymmetric context for signature generation.
+  @param  message_hash                      Pointer to octet message hash to be signed (after hash).
+  @param  hash_size                  size of the hash in bytes.
+  @param  signature                    Pointer to buffer to receive signature.
+  @param  sig_size                      On input, the size of signature buffer in bytes.
+                                       On output, the size of data returned in signature buffer in bytes.
+
+  @retval  TRUE   signature successfully generated.
+  @retval  FALSE  signature generation failed.
+  @retval  FALSE  sig_size is too small.
+**/
+boolean spdm_req_asym_sign_hash(
+			   IN spdm_version_number_t spdm_version, IN uint8 op_code,
+			   IN uint16 req_base_asym_alg,
+			   IN uint32 base_hash_algo, IN void *context,
+			   IN const uint8 *message_hash, IN uintn hash_size,
 			   OUT uint8 *signature, IN OUT uintn *sig_size);
 
 /**
@@ -671,7 +1126,8 @@ uint32 spdm_get_aead_tag_size(IN uint16 aead_cipher_suite);
   @retval TRUE   AEAD authenticated encryption succeeded.
   @retval FALSE  AEAD authenticated encryption failed.
 **/
-boolean spdm_aead_encryption(IN uint16 aead_cipher_suite, IN const uint8 *key,
+boolean spdm_aead_encryption(IN spdm_version_number_t secured_message_version,
+			     IN uint16 aead_cipher_suite, IN const uint8 *key,
 			     IN uintn key_size, IN const uint8 *iv,
 			     IN uintn iv_size, IN const uint8 *a_data,
 			     IN uintn a_data_size, IN const uint8 *data_in,
@@ -700,7 +1156,8 @@ boolean spdm_aead_encryption(IN uint16 aead_cipher_suite, IN const uint8 *key,
   @retval TRUE   AEAD authenticated decryption succeeded.
   @retval FALSE  AEAD authenticated decryption failed.
 **/
-boolean spdm_aead_decryption(IN uint16 aead_cipher_suite, IN const uint8 *key,
+boolean spdm_aead_decryption(IN spdm_version_number_t secured_message_version,
+			     IN uint16 aead_cipher_suite, IN const uint8 *key,
 			     IN uintn key_size, IN const uint8 *iv,
 			     IN uintn iv_size, IN const uint8 *a_data,
 			     IN uintn a_data_size, IN const uint8 *data_in,
@@ -727,6 +1184,18 @@ void spdm_get_random_number(IN uintn size, OUT uint8 *rand);
   @retval  FALSE  Certificate is not valid
 **/
 boolean spdm_x509_certificate_check(IN const uint8 *cert, IN uintn cert_size);
+
+/**
+  Return certificate is root cert or not.
+  Certificate is considered as a root certificate if the subjectname equal issuername.
+
+  @param[in]  cert            Pointer to the DER-encoded certificate data.
+  @param[in]  cert_size        The size of certificate data in bytes.
+
+  @retval  TRUE   Certificate is self-signed.
+  @retval  FALSE  Certificate is not self-signed.
+**/
+boolean spdm_is_root_certificate(IN const uint8 *cert, IN uintn cert_size);
 
 /**
   Retrieve the SubjectAltName from SubjectAltName Bytes.

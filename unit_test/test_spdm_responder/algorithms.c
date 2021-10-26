@@ -900,9 +900,9 @@ void test_spdm_responder_algorithms_case7(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x7;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -912,7 +912,7 @@ void test_spdm_responder_algorithms_case7(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP;
@@ -955,9 +955,9 @@ void test_spdm_responder_algorithms_case8(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x8;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -967,7 +967,7 @@ void test_spdm_responder_algorithms_case8(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP;
@@ -1009,9 +1009,9 @@ void test_spdm_responder_algorithms_case9(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x9;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1021,7 +1021,7 @@ void test_spdm_responder_algorithms_case9(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP;
@@ -1063,9 +1063,9 @@ void test_spdm_responder_algorithms_case10(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0xA;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1075,7 +1075,7 @@ void test_spdm_responder_algorithms_case10(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP;
@@ -1117,9 +1117,9 @@ void test_spdm_responder_algorithms_case11(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0xB;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1129,7 +1129,7 @@ void test_spdm_responder_algorithms_case11(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP;
@@ -1171,9 +1171,9 @@ void test_spdm_responder_algorithms_case12(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0xC;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1183,7 +1183,7 @@ void test_spdm_responder_algorithms_case12(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP;
@@ -1224,9 +1224,9 @@ void test_spdm_responder_algorithms_case13(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0xD;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1236,7 +1236,7 @@ void test_spdm_responder_algorithms_case13(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_CHAL_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_CHAL_CAP;
@@ -1272,15 +1272,15 @@ void test_spdm_responder_algorithms_case14(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0xE;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 0;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 0;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
   spdm_context->local_context.algorithm.measurement_hash_algo = m_use_measurement_hash_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   response_size = sizeof(response);
   status = spdm_get_response_algorithms (spdm_context, m_spdm_negotiate_algorithm_request10_size, &m_spdm_negotiate_algorithm_request10, &response_size, response);
@@ -1298,9 +1298,9 @@ void test_spdm_responder_algorithms_case15(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0xF;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1310,7 +1310,7 @@ void test_spdm_responder_algorithms_case15(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP;
@@ -1344,9 +1344,9 @@ void test_spdm_responder_algorithms_case16(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x10;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1356,7 +1356,7 @@ void test_spdm_responder_algorithms_case16(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP;
@@ -1399,9 +1399,9 @@ void test_spdm_responder_algorithms_case17(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x11;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1411,7 +1411,7 @@ void test_spdm_responder_algorithms_case17(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP;
@@ -1454,9 +1454,9 @@ void test_spdm_responder_algorithms_case18(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x12;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1466,7 +1466,7 @@ void test_spdm_responder_algorithms_case18(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP;
@@ -1505,9 +1505,9 @@ void test_spdm_responder_algorithms_case19(void **state) {
   spdm_context = spdm_test_context->spdm_context;
   spdm_test_context->case_id = 0x13;
   spdm_context->connection_info.connection_state = SPDM_CONNECTION_STATE_AFTER_CAPABILITIES;
-  spdm_context->connection_info.version.spdm_version_count = 1;
-  spdm_context->connection_info.version.spdm_version[0].major_version = 1;
-  spdm_context->connection_info.version.spdm_version[0].minor_version = 1;
+  
+  spdm_context->connection_info.version.major_version = 1;
+  spdm_context->connection_info.version.minor_version = 1;
   spdm_context->local_context.algorithm.base_hash_algo = m_use_hash_algo;
   spdm_context->local_context.algorithm.base_asym_algo = m_use_asym_algo;
   spdm_context->local_context.algorithm.measurement_spec = m_use_measurement_spec;
@@ -1517,7 +1517,7 @@ void test_spdm_responder_algorithms_case19(void **state) {
   spdm_context->local_context.algorithm.req_base_asym_alg = m_use_req_asym_algo;
   spdm_context->local_context.algorithm.key_schedule = m_use_key_schedule_algo;
 
-  spdm_context->transcript.message_a.buffer_size = 0;
+  spdm_reset_message_a(spdm_context);
 
   spdm_context->local_context.capability.flags |= SPDM_GET_CAPABILITIES_REQUEST_FLAGS_KEY_EX_CAP;
   spdm_context->connection_info.capability.flags |= SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_KEY_EX_CAP;

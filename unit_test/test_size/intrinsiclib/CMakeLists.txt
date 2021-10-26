@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 2.6)
 
 if(TOOLCHAIN MATCHES "VS")
-    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /GL-")
+    SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} /GL-")
+endif()
+
+if(TOOLCHAIN MATCHES "CLANG")
+    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-incompatible-library-redeclaration")
 endif()
 
 INCLUDE_DIRECTORIES(${LIBSPDM_DIR}/include

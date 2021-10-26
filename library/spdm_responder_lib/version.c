@@ -75,15 +75,15 @@ return_status spdm_get_response_version(IN void *context, IN uintn request_size,
 	}
 	spdm_request_size = request_size;
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	//
 	// Cache
 	//
-	reset_managed_buffer(&spdm_context->transcript.message_a);
-	reset_managed_buffer(&spdm_context->transcript.message_b);
-	reset_managed_buffer(&spdm_context->transcript.message_c);
+	spdm_reset_message_a(spdm_context);
+	spdm_reset_message_b(spdm_context);
+	spdm_reset_message_c(spdm_context);
 	status = spdm_append_message_a(spdm_context, spdm_request,
 				       spdm_request_size);
 	if (RETURN_ERROR(status)) {
@@ -121,20 +121,12 @@ return_status spdm_get_response_version(IN void *context, IN uintn request_size,
 	status = spdm_append_message_a(spdm_context, spdm_response,
 				       *response_size);
 	if (RETURN_ERROR(status)) {
-		reset_managed_buffer(&spdm_context->transcript.message_a);
+		spdm_reset_message_a(spdm_context);
 		spdm_generate_error_response(spdm_context,
 					     SPDM_ERROR_CODE_UNSPECIFIED, 0,
 					     response_size, response);
 		return RETURN_SUCCESS;
 	}
-
-	spdm_context->connection_info.version.spdm_version_count =
-		spdm_context->local_context.version.spdm_version_count;
-	copy_mem(
-		spdm_context->connection_info.version.spdm_version,
-		spdm_context->local_context.version.spdm_version,
-		sizeof(spdm_version_number_t) *
-			spdm_context->local_context.version.spdm_version_count);
 
 	spdm_set_connection_state(spdm_context,
 				  SPDM_CONNECTION_STATE_AFTER_VERSION);

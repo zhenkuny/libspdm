@@ -64,7 +64,7 @@ void test_spdm_responder_heartbeat_case1(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -140,7 +140,7 @@ void test_spdm_responder_heartbeat_case2(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -220,7 +220,7 @@ void test_spdm_responder_heartbeat_case3(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -301,7 +301,7 @@ void test_spdm_responder_heartbeat_case4(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -384,7 +384,7 @@ void test_spdm_responder_heartbeat_case5(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -471,7 +471,7 @@ void test_spdm_responder_heartbeat_case6(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -550,7 +550,7 @@ void test_spdm_responder_heartbeat_case7(void **state)
 	spdm_context->connection_info.local_used_cert_chain_buffer_size =
 		data_size1;
 	spdm_context->local_context.slot_count = 1;
-	spdm_context->transcript.message_a.buffer_size = 0;
+	spdm_reset_message_a(spdm_context);
 	spdm_context->local_context.mut_auth_requested = 0;
 	zero_mem(m_local_psk_hint, 32);
 	copy_mem(&m_local_psk_hint[0], TEST_PSK_HINT_STRING,
@@ -558,16 +558,6 @@ void test_spdm_responder_heartbeat_case7(void **state)
 	spdm_context->local_context.psk_hint_size =
 		sizeof(TEST_PSK_HINT_STRING);
 	spdm_context->local_context.psk_hint = m_local_psk_hint;
-	spdm_context->transcript.message_m.buffer_size =
-							spdm_context->transcript.message_m.max_buffer_size;
-	spdm_context->transcript.message_b.buffer_size =
-							spdm_context->transcript.message_b.max_buffer_size;
-	spdm_context->transcript.message_c.buffer_size =
-							spdm_context->transcript.message_c.max_buffer_size;
-	spdm_context->transcript.message_mut_b.buffer_size =
-							spdm_context->transcript.message_mut_b.max_buffer_size;
-	spdm_context->transcript.message_mut_c.buffer_size =
-							spdm_context->transcript.message_mut_c.max_buffer_size;
 
 	session_id = 0xFFFFFFFF;
 	spdm_context->latest_session_id = session_id;
@@ -580,6 +570,18 @@ void test_spdm_responder_heartbeat_case7(void **state)
 		SPDM_SESSION_STATE_ESTABLISHED);
 
 	response_size = sizeof(response);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	session_info->session_transcript.message_m.buffer_size =
+							session_info->session_transcript.message_m.max_buffer_size;
+	spdm_context->transcript.message_b.buffer_size =
+							spdm_context->transcript.message_b.max_buffer_size;
+	spdm_context->transcript.message_c.buffer_size =
+							spdm_context->transcript.message_c.max_buffer_size;
+	spdm_context->transcript.message_mut_b.buffer_size =
+							spdm_context->transcript.message_mut_b.max_buffer_size;
+	spdm_context->transcript.message_mut_c.buffer_size =
+							spdm_context->transcript.message_mut_c.max_buffer_size;
+#endif
 	status = spdm_get_response_heartbeat(spdm_context,
 					     m_spdm_heartbeat_request1_size,
 					     &m_spdm_heartbeat_request1,
@@ -589,11 +591,13 @@ void test_spdm_responder_heartbeat_case7(void **state)
 	spdm_response = (void *)response;
 	assert_int_equal(spdm_response->header.request_response_code,
 			 SPDM_HEARTBEAT_ACK);
-	assert_int_equal(spdm_context->transcript.message_m.buffer_size, 0);
+#if LIBSPDM_RECORD_TRANSCRIPT_DATA_SUPPORT
+	assert_int_equal(session_info->session_transcript.message_m.buffer_size, 0);
 	assert_int_equal(spdm_context->transcript.message_b.buffer_size, 0);
 	assert_int_equal(spdm_context->transcript.message_c.buffer_size, 0);
 	assert_int_equal(spdm_context->transcript.message_mut_b.buffer_size, 0);
 	assert_int_equal(spdm_context->transcript.message_mut_c.buffer_size, 0);
+#endif
 
 	free(data1);
 }

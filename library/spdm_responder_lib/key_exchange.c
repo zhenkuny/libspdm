@@ -90,6 +90,15 @@ return_status spdm_get_response_key_exchange(IN void *context,
 			return RETURN_SUCCESS;
 		}
 	}
+	if (!spdm_is_capabilities_flag_supported(
+			spdm_context, FALSE,
+			0, SPDM_GET_CAPABILITIES_RESPONSE_FLAGS_MEAS_CAP) &&
+			spdm_request->header.param1 > 0) {
+		spdm_generate_error_response(
+			spdm_context, SPDM_ERROR_CODE_UNSUPPORTED_REQUEST,
+			SPDM_KEY_EXCHANGE, response_size, response);
+		return RETURN_SUCCESS;
+	}
 
 	slot_id = spdm_request->header.param2;
 	if ((slot_id != 0xFF) &&
@@ -113,6 +122,12 @@ return_status spdm_get_response_key_exchange(IN void *context,
 	measurement_summary_hash_size = spdm_get_measurement_summary_hash_size(
 		spdm_context, FALSE, spdm_request->header.param1);
 
+	if ((measurement_summary_hash_size == 0) &&
+		(spdm_request->header.param2 != SPDM_CHALLENGE_REQUEST_NO_MEASUREMENT_SUMMARY_HASH)) {
+		return spdm_generate_error_response(spdm_context,
+						SPDM_ERROR_CODE_INVALID_REQUEST,
+						0, response_size, response);
+	}
 	if (request_size < sizeof(spdm_key_exchange_request_t) + dhe_key_size +
 				   sizeof(uint16)) {
 		spdm_generate_error_response(spdm_context,
@@ -147,7 +162,7 @@ return_status spdm_get_response_key_exchange(IN void *context,
 	opaque_key_exchange_rsp_size =
 		spdm_get_opaque_data_version_selection_data_size(spdm_context);
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	if (spdm_is_capabilities_flag_supported(
@@ -271,7 +286,7 @@ return_status spdm_get_response_key_exchange(IN void *context,
 		spdm_context->local_context
 			.local_cert_chain_provision_size[slot_id];
 
-	status = spdm_append_message_k(session_info, request, request_size);
+	status = spdm_append_message_k(spdm_context, session_info, FALSE, request, request_size);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, session_id);
 		spdm_generate_error_response(spdm_context,
@@ -280,7 +295,7 @@ return_status spdm_get_response_key_exchange(IN void *context,
 		return RETURN_SUCCESS;
 	}
 
-	status = spdm_append_message_k(session_info, spdm_response,
+	status = spdm_append_message_k(spdm_context, session_info, FALSE, spdm_response,
 				       (uintn)ptr - (uintn)spdm_response);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, session_id);
@@ -294,12 +309,12 @@ return_status spdm_get_response_key_exchange(IN void *context,
 	if (!result) {
 		spdm_free_session_id(spdm_context, session_id);
 		spdm_generate_error_response(
-			spdm_context, SPDM_ERROR_CODE_UNSUPPORTED_REQUEST,
+			spdm_context, SPDM_ERROR_CODE_UNSPECIFIED,
 			SPDM_KEY_EXCHANGE_RSP, response_size, response);
 		return RETURN_SUCCESS;
 	}
 
-	status = spdm_append_message_k(session_info, ptr, signature_size);
+	status = spdm_append_message_k(spdm_context, session_info, FALSE, ptr, signature_size);
 	if (RETURN_ERROR(status)) {
 		spdm_free_session_id(spdm_context, session_id);
 		spdm_generate_error_response(spdm_context,
@@ -345,7 +360,7 @@ return_status spdm_get_response_key_exchange(IN void *context,
 				0, response_size, response);
 			return RETURN_SUCCESS;
 		}
-		status = spdm_append_message_k(session_info, ptr, hmac_size);
+		status = spdm_append_message_k(spdm_context, session_info, FALSE, ptr, hmac_size);
 		if (RETURN_ERROR(status)) {
 			spdm_free_session_id(spdm_context, session_id);
 			spdm_generate_error_response(

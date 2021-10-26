@@ -6,6 +6,8 @@
 
 #include "spdm_requester_lib_internal.h"
 
+#if SPDM_ENABLE_CAPABILITY_CHAL_CAP
+
 /**
   Process the SPDM encapsulated CHALLENGE request and return the response.
 
@@ -69,7 +71,7 @@ return_status spdm_get_encap_response_challenge_auth(
 		return RETURN_SUCCESS;
 	}
 
-	spdm_reset_message_buffer_via_request_code(spdm_context,
+	spdm_reset_message_buffer_via_request_code(spdm_context, NULL,
 						spdm_request->header.request_response_code);
 
 	signature_size = spdm_get_req_asym_signature_size(
@@ -138,7 +140,7 @@ return_status spdm_get_encap_response_challenge_auth(
 	status = spdm_append_message_mut_c(spdm_context, spdm_response,
 					   (uintn)ptr - (uintn)spdm_response);
 	if (RETURN_ERROR(status)) {
-		reset_managed_buffer(&spdm_context->transcript.message_mut_c);
+		spdm_reset_message_mut_c(spdm_context);
 		spdm_generate_encap_error_response(
 			spdm_context, SPDM_ERROR_CODE_UNSPECIFIED, 0,
 			response_size, response);
@@ -156,3 +158,5 @@ return_status spdm_get_encap_response_challenge_auth(
 
 	return RETURN_SUCCESS;
 }
+
+#endif // SPDM_ENABLE_CAPABILITY_CHAL_CAP
