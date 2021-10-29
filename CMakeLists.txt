@@ -132,7 +132,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 
     if(TOOLCHAIN STREQUAL "GCC")
         SET(CMAKE_C_COMPILER gcc)
-        SET(CMAKE_C_FLAGS "-g -fshort-wchar -fno-strict-aliasing -Wall -Werror -Wno-array-bounds -ffunction-sections -fdata-sections -fno-common -maccumulate-outgoing-args -mno-red-zone -Wno-address -fpie -fno-asynchronous-unwind-tables -flto -DUSING_LTO  -Wno-maybe-uninitialized -Wno-uninitialized  -Wno-builtin-declaration-mismatch -Wno-nonnull-compare --coverage -fprofile-arcs -ftest-coverage")
+        SET(CMAKE_C_FLAGS "-g -fshort-wchar -fno-strict-aliasing -Wall -Wno-array-bounds -ffunction-sections -fdata-sections -fno-common -maccumulate-outgoing-args -mno-red-zone -Wno-address -fpie -fno-asynchronous-unwind-tables -flto -DUSING_LTO  -Wno-maybe-uninitialized -Wno-uninitialized  -Wno-builtin-declaration-mismatch -Wno-nonnull-compare --coverage -fprofile-arcs -ftest-coverage")
         SET(MBEDTLS_FLAGS "")
         SET(OPENSSL_FLAGS "-include base.h -Wno-error=maybe-uninitialized -Wno-error=format -Wno-format -Wno-error=unused-but-set-variable")
         SET(CMOCKA_FLAGS "-std=gnu99 -Wpedantic -Wall -Wshadow -Wmissing-prototypes -Wcast-align -Werror=address -Wstrict-prototypes -Werror=strict-prototypes -Wwrite-strings -Werror=write-strings -Werror-implicit-function-declaration -Wpointer-arith -Werror=pointer-arith -Wdeclaration-after-statement -Werror=declaration-after-statement -Wreturn-type -Werror=return-type -Wuninitialized -Werror=uninitialized -Werror=strict-overflow -Wstrict-overflow=2 -Wno-format-zero-length -Wmissing-field-initializers -Wformat-security -Werror=format-security -fno-common -Wformat -fno-common -fstack-protector-strong")
@@ -488,6 +488,8 @@ endif()
 
     ADD_SUBDIRECTORY(unit_test/fuzzing/test_spdm_requester_get_version)
     ADD_SUBDIRECTORY(unit_test/fuzzing/test_spdm_responder_version)
+
+    ADD_SUBDIRECTORY(unit_test/model_check/test_spdm_requester_get_version)
 
     ADD_SUBDIRECTORY(unit_test/test_size/cryptlib_dummy)
     ADD_SUBDIRECTORY(unit_test/test_size/cryptstublib_dummy)
