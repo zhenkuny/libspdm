@@ -11,6 +11,8 @@ esbmc \
   $LIBSPDM/unit_test/model_check/test_spdm_requester_get_version/get_version.c \
   $LIBSPDM/library/spdm_requester_lib/get_version.c \
   $LIBSPDM/os_stub/memlib/zero_mem.c \
+  $LIBSPDM/os_stub/memlib/compare_mem.c \
+  $LIBSPDM/os_stub/memlib/copy_mem.c \
   $LIBSPDM/library/spdm_common_lib/context_data.c \
   $LIBSPDM/library/spdm_secured_message_lib/context_data.c \
  -I $LIBSPDM/include/hal/ \
